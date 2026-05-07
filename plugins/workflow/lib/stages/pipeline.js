@@ -3,15 +3,24 @@ const path = require('node:path');
 
 function build(s, dir) {
   const summaryJsPath = path.resolve(__dirname, '..', 'summary.js');
+  const pluginRoot = path.resolve(__dirname, '..', '..');
   const stageName = 'pipeline';
   const retryContext = (s.stageFailures?.[stageName]?.length)
     ? `\nPRIOR ATTEMPT FAILED — address these failures before continuing:\n${s.stageFailures[stageName].join('\n---\n')}\n`
     : '';
+  const issuesLen = Array.isArray(s.issues) ? s.issues.length : 0;
+  const progressBlock = issuesLen > 0 ? `
+PROGRESS REPORTING
+(a) IMMEDIATELY at the start of this stage, initialize progress: \`node ${pluginRoot}/bin/report-progress.js ${dir} pipeline 0 ${issuesLen} "starting"\`.
+(b) After each issue is fully closed in STEP 4 (after substep f, gh issue close), bump: \`node ${pluginRoot}/bin/report-progress.js ${dir} pipeline <issuesCompleted> ${issuesLen} "issue <number>: <title>"\`.
+(c) For non-issue steps (STEP 5/6/7), keep current at ${issuesLen} and update only the label (e.g. "manual setup", "rhythm task", "pr summary").
+Do NOT skip a bump — this drives the UI progress bar.
+` : '';
   return `You are the pipeline orchestrator for CliDeck Workflow ${s.id}.
 
 CONTEXT FILE: ${join(dir, 'state.json')}
 Read it. You will use \`issues\`, \`branch\`, \`githubRepo\`.
-${retryContext}
+${retryContext}${progressBlock}
 
 STEP 1 — Confirm issue order.
 Read \`issues\`. Verify topological order against \`dependencies\`. Re-order if needed and write back.
