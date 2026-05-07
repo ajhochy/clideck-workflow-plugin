@@ -9,6 +9,7 @@ const { createRunner } = require('./lib/runner');
 const rhythm = require('./lib/rhythm');
 const summaryMod = require('./lib/summary');
 const { createPrModule } = require('./lib/pr');
+const resume = require('./lib/resume');
 
 function runGh(args, cwd) {
   return new Promise((resolve, reject) => {
@@ -45,6 +46,35 @@ module.exports = {
     rhythm.probe(api).then((ok) => {
       ctx.rhythmAvailable = ok;
       if (!ok) api.sendToFrontend('banner', { kind: 'warn', message: 'Rhythm MCP unavailable — manual setup will not auto-create tasks.' });
+    });
+
+    const resumables = resume.findResumable(root);
+    if (resumables.length) {
+      api.sendToFrontend('resume-prompt', {
+        workflows: resumables.map((s) => ({ id: s.id, title: s.title, currentStage: s.currentStage })),
+      });
+    }
+
+    api.onFrontendMessage('resume', ({ id }) => {
+      const dir = join(root, id);
+      if (!state.exists(dir)) return;
+      const s = state.read(dir);
+      // re-register inFlight branch
+      const set = ctx.inFlightBranches.get(s.projectId) || new Set();
+      if (s.branch) set.add(s.branch);
+      ctx.inFlightBranches.set(s.projectId, set);
+      const runner = createRunner({
+        dir, api, stages,
+        onAdvance: (u) => {
+          api.sendToFrontend('list', { workflows: listAll() });
+          finalize(u, dir).catch((e) => api.log(`finalize error: ${e.message}`));
+        },
+        lockFor: (stageName, wfId) => stageName === 'smoketest' ? ctx.smoketestLock.acquire(wfId) : null,
+        maxFixAttempts: api.getSetting('maxFixAttempts') ?? 2,
+      });
+      ctx.workflows.set(id, { dir, runner });
+      runner.start();
+      api.log(`Resumed workflow ${id} at stage ${s.currentStage}`);
     });
 
     function listAll() {

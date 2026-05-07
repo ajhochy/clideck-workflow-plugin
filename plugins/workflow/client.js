@@ -9,6 +9,7 @@
 let _api = null;
 let panelEl = null;
 let visible = false;
+let pendingResumables = null;
 
 // ---------------------------------------------------------------------------
 // Panel DOM bootstrap
@@ -65,6 +66,24 @@ function render(list) {
   header.appendChild(newBtn);
 
   p.appendChild(header);
+
+  // Resumables banner
+  if (pendingResumables && pendingResumables.length) {
+    const banner = document.createElement('div');
+    banner.style.cssText = 'background:#1f3a5f;border:1px solid #3b82f6;padding:8px;margin-bottom:8px;border-radius:6px;';
+    banner.innerHTML = '<strong>In-flight workflows</strong><div style="font-size:12px;opacity:0.8;margin-bottom:6px;">From a previous session.</div>';
+    for (const w of pendingResumables) {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-top:4px;';
+      row.innerHTML = `<span>${w.title} <span style="opacity:0.7;font-size:11px">(stage: ${w.currentStage})</span></span>`;
+      const btn = document.createElement('button');
+      btn.textContent = 'Resume';
+      btn.onclick = () => { _api.send('resume', { id: w.id }); pendingResumables = pendingResumables.filter((x) => x.id !== w.id); _api.send('list'); };
+      row.appendChild(btn);
+      banner.appendChild(row);
+    }
+    p.appendChild(banner);
+  }
 
   // Empty state
   if (!list || !list.length) {
@@ -230,6 +249,17 @@ export function init(api) {
   // Workflow created successfully — go back to list
   api.onMessage('created', () => {
     requestList();
+  });
+
+  // Resume prompt from backend — show in-flight workflows banner
+  api.onMessage('resume-prompt', ({ workflows }) => {
+    if (!workflows || !workflows.length) return;
+    // Open the panel and insert a banner section at the top
+    visible = true;
+    ensurePanel().style.display = 'block';
+    // After the next render, insert the banner. Simplest: maintain a pendingResumables variable and have render() pick it up.
+    pendingResumables = workflows;
+    _api.send('list'); // trigger a re-render
   });
 
   // Warning from backend (e.g. branch conflict, validation)
