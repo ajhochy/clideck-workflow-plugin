@@ -223,12 +223,7 @@ export function init(api) {
 
   // Receive workflow list from backend
   api.onMessage('list', (msg) => {
-    // Backend sends sendToFrontend('list', list) where list is the array.
-    // The full message arrives as { type: '...', ...spread } — the array is
-    // spread if it was sent with api.sendToFrontend('list', list).
-    // In index.js: api.sendToFrontend('list', list) → broadcast({ ...list, type })
-    // list is an array, so spreading it gives numeric keys; guard both shapes.
-    const workflows = Array.isArray(msg) ? msg : (Array.isArray(msg.workflows) ? msg.workflows : []);
+    const workflows = Array.isArray(msg?.workflows) ? msg.workflows : [];
     render(workflows);
   });
 
