@@ -275,6 +275,71 @@ module.exports = {
       if (sess) api.sendToFrontend('focusSession', { sessionId: sess });
     });
 
+    api.onFrontendMessage('delete', ({ id }) => {
+      if (!id) {
+        try { api.sendToFrontend('warn', { message: 'delete: missing workflow id' }); } catch (_) {}
+        return;
+      }
+      const dir = join(root, id);
+      const known = ctx.workflows.has(id) || fs.existsSync(dir);
+      if (!known) {
+        try { api.sendToFrontend('warn', { message: `delete: unknown workflow ${id}` }); } catch (_) {}
+        return;
+      }
+      const entry = ctx.workflows.get(id);
+
+      // (2) Close active session.
+      try {
+        if (entry?.activeSession) api.closeSession(entry.activeSession);
+      } catch (_) {}
+
+      // (3) Stop runner.
+      try {
+        if (entry?.runner && typeof entry.runner.stop === 'function') entry.runner.stop();
+      } catch (_) {}
+
+      // (4) Remove branch from inFlightBranches.
+      try {
+        const s = state.read(dir);
+        if (s.projectId && s.branch) {
+          const set = ctx.inFlightBranches.get(s.projectId);
+          if (set) {
+            set.delete(s.branch);
+            if (set.size === 0) ctx.inFlightBranches.delete(s.projectId);
+          }
+        }
+      } catch (_) { /* state.json may already be gone */ }
+
+      // (5) Close+remove relay streams for this workflow.
+      try {
+        const prefix = `${id}:`;
+        for (const [key, stream] of relayStreams) {
+          if (key.startsWith(prefix)) {
+            try { stream.close({}); } catch (_) {}
+            relayStreams.delete(key);
+          }
+        }
+      } catch (_) {}
+
+      // (6) Close+remove the state-watcher.
+      try {
+        const watcher = stateWatchers.get(id);
+        if (watcher) { try { watcher.close(); } catch (_) {} stateWatchers.delete(id); }
+      } catch (_) {}
+
+      // (7) Drop ctx.workflows entry.
+      try { ctx.workflows.delete(id); } catch (_) {}
+
+      // (8) rm -rf workflow folder.
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+
+      // (9) Broadcast updated list.
+      try { api.sendToFrontend('list', { workflows: listAll() }); } catch (_) {}
+
+      // (10) Log.
+      try { api.log(`Deleted workflow ${id}`); } catch (_) {}
+    });
+
     api.onShutdown(() => api.log('Workflow plugin shutting down'));
   },
 };
