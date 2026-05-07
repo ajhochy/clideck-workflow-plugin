@@ -289,26 +289,27 @@ module.exports = {
 
     api.onFrontendMessage('delete', ({ id }) => {
       if (!id) {
-        try { api.sendToFrontend('warn', { message: 'delete: missing workflow id' }); } catch (_) {}
+        try { api.sendToFrontend('delete-result', { id: null, success: false, error: 'missing workflow id' }); } catch (_) {}
         return;
       }
       const dir = join(root, id);
       const known = ctx.workflows.has(id) || fs.existsSync(dir);
       if (!known) {
-        try { api.sendToFrontend('warn', { message: `delete: unknown workflow ${id}` }); } catch (_) {}
+        try { api.sendToFrontend('delete-result', { id, success: false, error: `unknown workflow ${id}` }); } catch (_) {}
         return;
       }
       const entry = ctx.workflows.get(id);
+      const teardownErrors = [];
 
       // (2) Close active session.
       try {
-        if (entry?.activeSession) api.closeSession(entry.activeSession);
-      } catch (_) {}
+        if (entry && entry.activeSession) api.closeSession(entry.activeSession);
+      } catch (e) { teardownErrors.push(e); }
 
       // (3) Stop runner.
       try {
-        if (entry?.runner && typeof entry.runner.stop === 'function') entry.runner.stop();
-      } catch (_) {}
+        if (entry && entry.runner && typeof entry.runner.stop === 'function') entry.runner.stop();
+      } catch (e) { teardownErrors.push(e); }
 
       // (4) Remove branch from inFlightBranches.
       try {
@@ -320,7 +321,7 @@ module.exports = {
             if (set.size === 0) ctx.inFlightBranches.delete(s.projectId);
           }
         }
-      } catch (_) { /* state.json may already be gone */ }
+      } catch (e) { teardownErrors.push(e); }
 
       // (5) Close+remove relay streams for this workflow.
       try {
@@ -331,25 +332,37 @@ module.exports = {
             relayStreams.delete(key);
           }
         }
-      } catch (_) {}
+      } catch (e) { teardownErrors.push(e); }
 
       // (6) Close+remove the state-watcher.
       try {
         const watcher = stateWatchers.get(id);
         if (watcher) { try { watcher.close(); } catch (_) {} stateWatchers.delete(id); }
-      } catch (_) {}
+      } catch (e) { teardownErrors.push(e); }
 
       // (7) Drop ctx.workflows entry.
-      try { ctx.workflows.delete(id); } catch (_) {}
+      try { ctx.workflows.delete(id); } catch (e) { teardownErrors.push(e); }
 
-      // (8) rm -rf workflow folder.
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      if (teardownErrors.length) {
+        try { api.log('Teardown errors during delete of ' + id + ': ' + teardownErrors.map(e => e.message).join('; ')); } catch (_) {}
+      }
 
-      // (9) Broadcast updated list.
-      try { api.sendToFrontend('list', { workflows: listAll() }); } catch (_) {}
-
-      // (10) Log.
-      try { api.log(`Deleted workflow ${id}`); } catch (_) {}
+      // (8) Schedule rm with grace period for any lingering fs handles.
+      setTimeout(() => {
+        const lastErr = performDeleteRm(dir);
+        const success = !fs.existsSync(dir);
+        if (success) { try { api.sendToFrontend('list', { workflows: listAll() }); } catch (_) {} }
+        try {
+          api.sendToFrontend('delete-result', {
+            id,
+            success,
+            error: success ? null : ((lastErr && lastErr.message) || 'directory still exists after rmSync'),
+          });
+        } catch (_) {}
+        try {
+          api.log(success ? `Deleted workflow ${id}` : `Failed to delete workflow ${id}: ${(lastErr && lastErr.message) || 'unknown error'}`);
+        } catch (_) {}
+      }, 250);
     });
 
     api.onShutdown(() => api.log('Workflow plugin shutting down'));
