@@ -26,12 +26,18 @@ function createRunner({ dir, api, stages, onAdvance = () => {}, lockFor = null, 
       if (lockPromise) currentLock = await lockPromise;
     }
     const prompt = stage.build(s, dir);
-    currentSession = api.createSession({
+    const sid = api.createSession({
       name: `Workflow ${s.id} · ${s.currentStage}`,
-      preset: stage.preset || 'claude-code',
+      presetId: stage.preset || 'claude-code',
       projectId: s.projectId,
-      starterPrompt: prompt,
+      extraArgs: stage.extraArgs || [],
     });
+    currentSession = sid;
+    if (sid && prompt) {
+      // Agents need a few seconds to boot before they accept input.
+      setTimeout(() => { try { api.inputToSession(sid, prompt); } catch {} }, 4000);
+      setTimeout(() => { try { api.inputToSession(sid, '\r'); } catch {} }, 4250);
+    }
   }
 
   function handleMarker(filename) {
