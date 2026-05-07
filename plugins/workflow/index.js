@@ -173,7 +173,7 @@ module.exports = {
         });
         return;
       }
-      const id = wf.newWorkflowId();
+      const id = wf.newWorkflowId(finalTitle);
       const dir = wf.initFolder(root, id);
       const s = state.createState({
         id,
