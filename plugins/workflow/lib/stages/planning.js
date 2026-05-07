@@ -9,7 +9,8 @@ function build(s, dir) {
   const retryContext = (s.stageFailures?.[stageName]?.length)
     ? `\nPRIOR ATTEMPT FAILED — address these failures before continuing:\n${s.stageFailures[stageName].join('\n---\n')}\n`
     : '';
-  return `You are the planning lead for CliDeck Workflow ${s.id}.
+  return `You are the planning lead for CliDeck Workflow ${s.title}.
+(Workflow folder: ${dir})
 
 MODEL: Use the Opus model for this session (planning requires deeper reasoning). If your CLI lets you switch models, switch to Opus before beginning.
 
