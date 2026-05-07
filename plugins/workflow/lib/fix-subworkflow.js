@@ -4,7 +4,7 @@ function shouldRetry(s, max) { return (s.fixAttempts?.length || 0) < max; }
 
 function buildFixPrompt(s, dir) {
   const failures = JSON.stringify(s.smoketestResult?.failures || [], null, 2);
-  return `You are the fix planner for CliDeck Workflow ${s.id} (fix attempt ${(s.fixAttempts?.length || 0) + 1}).
+  return `You are the fix planner for CliDeck Workflow ${s.title || s.id} (fix attempt ${(s.fixAttempts?.length || 0) + 1}).
 
 CONTEXT FILE: ${join(dir, 'state.json')}
 SMOKETEST FAILURES TO ADDRESS:
