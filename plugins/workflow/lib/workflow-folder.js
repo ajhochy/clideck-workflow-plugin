@@ -2,10 +2,22 @@ const { mkdirSync, readdirSync, existsSync } = require('node:fs');
 const { join } = require('node:path');
 const state = require('./state');
 
-function newWorkflowId() {
+function newWorkflowId(title) {
+  const rand = Math.random().toString(36).slice(2, 8);
+  if (title !== undefined) {
+    const slug =
+      String(title || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .trim()
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 60) || 'workflow';
+    return `${slug}-${rand}`;
+  }
   const d = new Date();
   const date = d.toISOString().slice(0, 10);
-  const rand = Math.random().toString(36).slice(2, 8);
   return `wf-${date}-${rand}`;
 }
 

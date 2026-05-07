@@ -3,7 +3,7 @@ const { join } = path;
 
 function build(s, dir) {
   const pluginRoot = path.resolve(__dirname, '..', '..');
-  return `You are the smoketest agent for CliDeck Workflow ${s.id}. You are Codex with computer-use capability.
+  return `You are the smoketest agent for CliDeck Workflow ${s.title || s.id}. You are Codex with computer-use capability.
 
 CONTEXT FILE: ${join(dir, 'state.json')}
 Read it. You will use \`description\`, \`plan\`, \`issues\`, \`manualSetup\`, and the diff vs the base branch.
