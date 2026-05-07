@@ -16,6 +16,7 @@ function createState({ id, title, description, projectId, githubRepo = null, bra
     smoketestResult: null,
     fixAttempts: [],
     stageFailures: {},
+    stageProgress: {},
     createdAt: now,
     updatedAt: now,
   };
