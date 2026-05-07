@@ -161,9 +161,16 @@ function codexConfigLooksHealthy(content, port) {
   if (!codexHooksHealthy(os.homedir(), codexHookPath, port)) return false;
   const notifyLine = content.match(/^\s*notify\s*=\s*\[(.+)\]\s*$/m)?.[1] || '';
   if (!notifyLine.includes('notify-helper')) return false;
-  const quoted = [...notifyLine.matchAll(/"([^"]+)"/g)].map(m => m[1]);
-  const helperPath = quoted.find(v => v.includes('notify-helper'));
-  return !!helperPath && existsSync(helperPath);
+  // Helper path may appear at top level OR nested inside a wrapper's
+  // --previous-notify JSON-encoded argument (e.g. SkyComputerUseClient).
+  // Scan the raw line for any /...notify-helper.js with escaped or plain
+  // slashes, unescape, and verify the file exists.
+  const matches = [...notifyLine.matchAll(/(\/(?:[^"\s]|\\\/|\\")*?notify-helper\.js)/g)];
+  for (const m of matches) {
+    const candidate = m[1].replace(/\\\//g, '/').replace(/\\"/g, '"');
+    if (existsSync(candidate)) return true;
+  }
+  return false;
 }
 
 function detectTelemetryConfig(c) {
