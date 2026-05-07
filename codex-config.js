@@ -77,4 +77,16 @@ function validateCodexConfigToml(content) {
   return { ok: true };
 }
 
-module.exports = { upsertCodexConfig, validateCodexConfigToml };
+function codexNotifyHelperConfigured(content) {
+  if (!content) return false;
+  const lines = String(content).replace(/\r\n/g, '\n').split('\n');
+  for (const line of lines) {
+    const t = line.trim();
+    if (!/^notify\s*=/.test(t)) continue;
+    if (t.includes('notify-helper.js')) return true;
+    if (t.includes('previous-notify') && /notify-helper\.js/.test(t)) return true;
+  }
+  return false;
+}
+
+module.exports = { upsertCodexConfig, validateCodexConfigToml, codexNotifyHelperConfigured };
