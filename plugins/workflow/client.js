@@ -291,9 +291,9 @@ function renderForm() {
       if (warnEl2) warnEl2.textContent = '';
       return;
     }
-    // TODO: replace 'unknown' with a real projectId if the frontend API is extended
     branchValidateTimer = setTimeout(() => {
-      _api.send('validate-branch', { projectId: 'unknown', branch: val });
+      const projectId = (typeof _api.getActiveProjectId === 'function' && _api.getActiveProjectId()) || 'unknown';
+      _api.send('validate-branch', { projectId, branch: val });
     }, 250);
   };
 
@@ -320,10 +320,7 @@ function renderForm() {
       return;
     }
 
-    // TODO: CliDeck frontend API (app.js) exposes no getActiveProjectId().
-    // Only getActiveSessionId() is available. Replace 'unknown' with a real
-    // projectId lookup if the API is extended in the future.
-    const projectId = 'unknown';
+    const projectId = (typeof _api.getActiveProjectId === 'function' && _api.getActiveProjectId()) || 'unknown';
 
     _api.send('create', { description, title: wfTitle, branch, projectId });
     startBtn.disabled = true;
