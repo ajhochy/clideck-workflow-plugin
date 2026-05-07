@@ -173,6 +173,14 @@ module.exports = {
       runner.start();
     });
 
+    api.onFrontendMessage('validate-branch', ({ projectId, branch: branchVal }) => {
+      const set = ctx.inFlightBranches.get(projectId) || new Set();
+      api.sendToFrontend('branch-validation', {
+        branch: branchVal,
+        inUse: !!(branchVal && set.has(branchVal)),
+      });
+    });
+
     api.onFrontendMessage('chat', ({ id, text }) => {
       const sess = ctx.workflows.get(id)?.activeSession;
       if (sess) api.inputToSession(sess, text + '\r');

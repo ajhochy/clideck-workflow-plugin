@@ -11,6 +11,7 @@ let panelEl = null;
 let visible = false;
 let pendingResumables = null;
 let expandedId = null;
+let branchValidateTimer = null;
 
 const STAGE_ORDER = ['planning', 'issues', 'pipeline', 'smoketest'];
 const STAGE_LABELS = { planning: 'Planning', issues: 'Issues', pipeline: 'Pipeline', smoketest: 'Smoke test' };
@@ -281,6 +282,21 @@ function renderForm() {
   branchInput.style.cssText = inputStyle;
   p.appendChild(branchInput);
 
+  // Live branch collision validation
+  branchInput.oninput = () => {
+    clearTimeout(branchValidateTimer);
+    const val = branchInput.value.trim();
+    const warnEl2 = document.getElementById('wf-warn');
+    if (!val || val === 'auto') {
+      if (warnEl2) warnEl2.textContent = '';
+      return;
+    }
+    // TODO: replace 'unknown' with a real projectId if the frontend API is extended
+    branchValidateTimer = setTimeout(() => {
+      _api.send('validate-branch', { projectId: 'unknown', branch: val });
+    }, 250);
+  };
+
   // Warning text
   const warnEl = document.createElement('div');
   warnEl.id = 'wf-warn';
@@ -363,6 +379,20 @@ export function init(api) {
   // Focus a session when the backend asks
   api.onMessage('focusSession', ({ sessionId }) => {
     if (sessionId && typeof api.focusSession === 'function') api.focusSession(sessionId);
+  });
+
+  // Live branch-collision validation response from backend
+  api.onMessage('branch-validation', ({ branch: b, inUse }) => {
+    const inputEl = document.getElementById('wf-branch');
+    const warnEl = document.getElementById('wf-warn');
+    if (!inputEl || !warnEl) return;
+    if (inputEl.value.trim() !== b) return; // stale response — ignore
+    if (inUse) {
+      warnEl.textContent = `Branch "${b}" is already in use by another in-flight workflow on this project.`;
+      warnEl.style.color = '#fbbf24'; // amber
+    } else {
+      warnEl.textContent = '';
+    }
   });
 
   // Warning from backend (e.g. branch conflict, validation)
