@@ -6,13 +6,8 @@ function build(s, dir) {
 CONTEXT FILE: ${join(dir, 'state.json')}
 Read it. You will use \`description\`, \`plan\`, \`issues\`, \`manualSetup\`, and the diff vs the base branch.
 
-STEP 1 — Generate smoketest.md (do NOT commit yet).
-Write a Markdown checklist to ${join(dir, 'smoketest.md')}. Do not git-add, commit, or push at this step.
-Each checklist item must include:
-- What to do (precise steps)
-- What to verify (expected outcome)
-- Where to verify it (browser URL, native app name, email inbox, log file, etc.)
-Include cross-app checks where the change implies them — e.g., if the feature sends an email, the checklist must verify the email arrived in the user's mail client.
+STEP 1 — Load existing smoketest.md.
+Read ${join(dir, 'smoketest.md')} which was authored by the planning agent. Verify it is non-empty and contains at least one checklist item. If the file is missing or empty, write a brief failure description to ${join(dir, 'done', 'smoketest.failed')} and stop. Do NOT regenerate the file.
 
 STEP 2 — Execute the checklist via clickthrough.
 For each item, drive the appropriate surface:
@@ -20,6 +15,7 @@ For each item, drive the appropriate surface:
 - Native desktop app: open and interact via accessibility
 - Email/messaging client: verify message arrival
 - CLI/HTTP: run the command or curl, inspect output
+Pay attention to cross-app checks (e.g., if an item verifies an email arrived, open the mail client).
 Capture evidence per item (screenshot file path, log snippet, command output). Annotate smoketest.md inline with ✅ / ❌ + evidence under each item.
 COMMIT CADENCE: Do NOT commit between items. Run all items first, accumulate evidence in smoketest.md and any evidence directory, then make exactly ONE commit at the end of step 2 covering smoketest.md + evidence. Use a single commit message: \`test: record smoketest results\`. Push once. Repeated per-item commits pollute PR history and are forbidden. If the run fails partway, still commit once with whatever partial state you have.
 

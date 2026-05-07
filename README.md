@@ -90,6 +90,12 @@ Guides, agent setup, plugin development: **[docs.clideck.dev](https://docs.clide
 
 Built with [xterm.js](https://xtermjs.org/).
 
+## Dedicated plugin repo
+
+The workflow plugin has a dedicated canonical home at **https://github.com/ajhochy/clideck-workflow-plugin**.
+
+Changes are still authored from inside this clideck monorepo worktree until a later extraction milestone. The `plugin` git remote in this worktree points at the dedicated repo, so commits on `feat/cli-deck-3` are pushed there via `git push plugin`.
+
 ## License
 
 MIT - see [LICENSE](LICENSE).

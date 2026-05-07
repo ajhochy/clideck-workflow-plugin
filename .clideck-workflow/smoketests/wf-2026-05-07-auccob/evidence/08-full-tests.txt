@@ -1,0 +1,268 @@
+TAP version 13
+# Subtest: slugFromTitle generates feat/<kebab>
+ok 1 - slugFromTitle generates feat/<kebab>
+  ---
+  duration_ms: 0.961959
+  type: 'test'
+  ...
+# Subtest: slugFromTitle truncates and falls back
+ok 2 - slugFromTitle truncates and falls back
+  ---
+  duration_ms: 0.883125
+  type: 'test'
+  ...
+# Subtest: isCollision returns true when branch is in inFlight set
+ok 3 - isCollision returns true when branch is in inFlight set
+  ---
+  duration_ms: 0.198667
+  type: 'test'
+  ...
+# Subtest: shouldRetry returns false after maxAttempts
+ok 4 - shouldRetry returns false after maxAttempts
+  ---
+  duration_ms: 0.447708
+  type: 'test'
+  ...
+# Subtest: buildFixPrompt for Phase-1-abbreviated includes failure list and skips architecture pass
+ok 5 - buildFixPrompt for Phase-1-abbreviated includes failure list and skips architecture pass
+  ---
+  duration_ms: 0.203833
+  type: 'test'
+  ...
+# Subtest: event() appends a parseable JSON line to {stage}.log and events.log
+ok 6 - event() appends a parseable JSON line to {stage}.log and events.log
+  ---
+  duration_ms: 8.193375
+  type: 'test'
+  ...
+# Subtest: prompt() writes a plain-text section containing header and text body to {stage}.prompt.log
+ok 7 - prompt() writes a plain-text section containing header and text body to {stage}.prompt.log
+  ---
+  duration_ms: 2.518958
+  type: 'test'
+  ...
+# Subtest: error() writes to errors.log with stack field and is parseable JSON
+ok 8 - error() writes to errors.log with stack field and is parseable JSON
+  ---
+  duration_ms: 2.095208
+  type: 'test'
+  ...
+# Subtest: openSessionStream() onData appends string and Buffer chunks in order; close() writes footer; close() twice does not duplicate footer
+ok 9 - openSessionStream() onData appends string and Buffer chunks in order; close() writes footer; close() twice does not duplicate footer
+  ---
+  duration_ms: 2.733667
+  type: 'test'
+  ...
+# Subtest: Logger creates {dir}/logs/ automatically when it does not exist
+ok 10 - Logger creates {dir}/logs/ automatically when it does not exist
+  ---
+  duration_ms: 1.203167
+  type: 'test'
+  ...
+# Subtest: openDraftPr uses --draft and parses pr number from URL
+ok 11 - openDraftPr uses --draft and parses pr number from URL
+  ---
+  duration_ms: 2.650791
+  type: 'test'
+  ...
+# Subtest: markReady invokes pr ready
+ok 12 - markReady invokes pr ready
+  ---
+  duration_ms: 0.322875
+  type: 'test'
+  ...
+# Subtest: findResumable returns workflows whose currentStage is not done/failed
+ok 13 - findResumable returns workflows whose currentStage is not done/failed
+  ---
+  duration_ms: 14.686666
+  type: 'test'
+  ...
+# Subtest: runner advances state when a marker file appears
+ok 14 - runner advances state when a marker file appears
+  ---
+  duration_ms: 212.16
+  type: 'test'
+  ...
+# Subtest: runner ignores stale marker (one for a stage already past)
+ok 15 - runner ignores stale marker (one for a stage already past)
+  ---
+  duration_ms: 209.043417
+  type: 'test'
+  ...
+# Subtest: runner waits for lockFor when entering a locked stage and releases on advance
+ok 16 - runner waits for lockFor when entering a locked stage and releases on advance
+  ---
+  duration_ms: 206.513833
+  type: 'test'
+  ...
+# Subtest: runner triggers fix sub-workflow on smoketest failure when retries available
+ok 17 - runner triggers fix sub-workflow on smoketest failure when retries available
+  ---
+  duration_ms: 208.2685
+  type: 'test'
+  ...
+# Subtest: runner re-spawns stage once on .failed marker, then gives up on second failure
+ok 18 - runner re-spawns stage once on .failed marker, then gives up on second failure
+  ---
+  duration_ms: 357.322916
+  type: 'test'
+  ...
+# Subtest: runner marks failed when max fix attempts exceeded
+ok 19 - runner marks failed when max fix attempts exceeded
+  ---
+  duration_ms: 204.252584
+  type: 'test'
+  ...
+# Subtest: first acquire resolves immediately, second waits, release lets next through
+ok 20 - first acquire resolves immediately, second waits, release lets next through
+  ---
+  duration_ms: 0.937541
+  type: 'test'
+  ...
+# Subtest: cancel removes a waiter from the queue
+ok 21 - cancel removes a waiter from the queue
+  ---
+  duration_ms: 0.348042
+  type: 'test'
+  ...
+# Subtest: issues prompt requires gh repo detection and falls back to local TODO list
+ok 22 - issues prompt requires gh repo detection and falls back to local TODO list
+  ---
+  duration_ms: 0.606
+  type: 'test'
+  ...
+# Subtest: pipeline prompt covers worktree-per-issue, CI watch, draft PR after first commit, manual setup + Rhythm task
+ok 23 - pipeline prompt covers worktree-per-issue, CI watch, draft PR after first commit, manual setup + Rhythm task
+  ---
+  duration_ms: 1.62225
+  type: 'test'
+  ...
+# Subtest: planning prompt includes state path, description, and instructs codebase exploration before Q&A
+ok 24 - planning prompt includes state path, description, and instructs codebase exploration before Q&A
+  ---
+  duration_ms: 0.628459
+  type: 'test'
+  ...
+# Subtest: planning uses claude-code preset and instructs Opus model in prompt body
+ok 25 - planning uses claude-code preset and instructs Opus model in prompt body
+  ---
+  duration_ms: 0.161209
+  type: 'test'
+  ...
+# Subtest: planning prompt includes smoketest.md authoring phase before signal completion
+ok 26 - planning prompt includes smoketest.md authoring phase before signal completion
+  ---
+  duration_ms: 0.138166
+  type: 'test'
+  ...
+# Subtest: smoketest prompt instructs codex to load existing smoketest.md, execute checklist with cross-app checks, and write result
+ok 27 - smoketest prompt instructs codex to load existing smoketest.md, execute checklist with cross-app checks, and write result
+  ---
+  duration_ms: 0.662125
+  type: 'test'
+  ...
+# Subtest: preset is codex
+ok 28 - preset is codex
+  ---
+  duration_ms: 0.081542
+  type: 'test'
+  ...
+# Subtest: extraArgs contains bypass flag
+ok 29 - extraArgs contains bypass flag
+  ---
+  duration_ms: 0.082167
+  type: 'test'
+  ...
+# Subtest: smoketest prompt creates marker file as final step
+ok 30 - smoketest prompt creates marker file as final step
+  ---
+  duration_ms: 0.081083
+  type: 'test'
+  ...
+# Subtest: createState produces a default object with required fields
+ok 31 - createState produces a default object with required fields
+  ---
+  duration_ms: 1.26875
+  type: 'test'
+  ...
+# Subtest: write then read round-trips state
+ok 32 - write then read round-trips state
+  ---
+  duration_ms: 1.059833
+  type: 'test'
+  ...
+# Subtest: update mutates and bumps updatedAt
+ok 33 - update mutates and bumps updatedAt
+  ---
+  duration_ms: 0.606
+  type: 'test'
+  ...
+# Subtest: summary uses plain language and covers ask, built, manual, verified, broken
+ok 34 - summary uses plain language and covers ask, built, manual, verified, broken
+  ---
+  duration_ms: 0.713041
+  type: 'test'
+  ...
+# Subtest: summary surfaces failures clearly when smoketest failed
+ok 35 - summary surfaces failures clearly when smoketest failed
+  ---
+  duration_ms: 0.17675
+  type: 'test'
+  ...
+# Subtest: writeSummary creates summary.md on first call
+ok 36 - writeSummary creates summary.md on first call
+  ---
+  duration_ms: 0.720583
+  type: 'test'
+  ...
+# Subtest: writeSummary second call creates summary.run2.md; summary.md is untouched
+ok 37 - writeSummary second call creates summary.run2.md; summary.md is untouched
+  ---
+  duration_ms: 0.74525
+  type: 'test'
+  ...
+# Subtest: writeSummary third call creates summary.run3.md
+ok 38 - writeSummary third call creates summary.run3.md
+  ---
+  duration_ms: 1.473416
+  type: 'test'
+  ...
+# Subtest: nextSummaryFilename returns run4 when run2 is deleted but run3 exists
+ok 39 - nextSummaryFilename returns run4 when run2 is deleted but run3 exists
+  ---
+  duration_ms: 1.07
+  type: 'test'
+  ...
+# Subtest: newWorkflowId is unique and time-ordered
+ok 40 - newWorkflowId is unique and time-ordered
+  ---
+  duration_ms: 1.113709
+  type: 'test'
+  ...
+# Subtest: initFolder creates state.json, done/, logs/
+ok 41 - initFolder creates state.json, done/, logs/
+  ---
+  duration_ms: 1.223667
+  type: 'test'
+  ...
+# Subtest: listMarkers returns all .done basenames
+ok 42 - listMarkers returns all .done basenames
+  ---
+  duration_ms: 1.6465
+  type: 'test'
+  ...
+# Subtest: listWorkflows returns all subfolders that contain state.json
+ok 43 - listWorkflows returns all subfolders that contain state.json
+  ---
+  duration_ms: 3.055417
+  type: 'test'
+  ...
+1..43
+# tests 43
+# suites 0
+# pass 43
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5539.795333

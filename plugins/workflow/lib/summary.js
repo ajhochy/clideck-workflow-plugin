@@ -41,4 +41,33 @@ function render(s) {
   return lines.join('\n') + '\n';
 }
 
-module.exports = { render };
+const fs = require('fs');
+const path = require('path');
+
+function nextSummaryFilename(dir) {
+  const base = path.join(dir, 'summary.md');
+  if (!fs.existsSync(base)) return 'summary.md';
+  const entries = fs.readdirSync(dir);
+  const rx = /^summary\.run(\d+)\.md$/;
+  let max = 1;
+  for (const entry of entries) {
+    const m = rx.exec(entry);
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (n > max) max = n;
+    }
+  }
+  return `summary.run${max + 1}.md`;
+}
+
+function writeSummary(dir, content) {
+  const name = nextSummaryFilename(dir);
+  const fullPath = path.join(dir, name);
+  if (fs.existsSync(fullPath)) {
+    throw new Error(`writeSummary: file already exists: ${fullPath}`);
+  }
+  fs.writeFileSync(fullPath, content);
+  return fullPath;
+}
+
+module.exports = { render, nextSummaryFilename, writeSummary };

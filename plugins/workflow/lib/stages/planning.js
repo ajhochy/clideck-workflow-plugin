@@ -13,7 +13,7 @@ function build(s, dir) {
 
 MODEL: Use the Opus model for this session (planning requires deeper reasoning). If your CLI lets you switch models, switch to Opus before beginning.
 
-Your job has 6 phases — execute them in order. Do NOT skip phases.
+Your job has 7 phases — execute them in order. Do NOT skip phases.
 
 CONTEXT FILE: ${join(dir, 'state.json')}
 Read it first. The user's description is the \`description\` field. Project root is whatever directory the session is running in.
@@ -44,7 +44,10 @@ Each step must be self-contained: an implementing agent should NOT need to re-re
 PHASE 5 — Write back to state.json.
 Append your plan to \`state.json.plan\` (a structured object: { steps: [...], coherenceRules: [...] }). Use a node script or jq, do not hand-edit blindly.
 
-PHASE 6 — Signal completion.
+PHASE 6 — Author smoketest.md.
+Based on the plan you just produced (state.json.plan.steps), write a complete Markdown smoketest checklist to ${join(dir, 'smoketest.md')}. Each checklist item must include: (a) precise actions to perform, (b) the exact expected result to verify, (c) where to verify (URL, native app, log file, command output), (d) any cross-app side effect to confirm (emails, external integrations). Cover every plan step plus any cross-cutting verifications implied by coherenceRules. Do NOT execute the checklist — only write the file. Do NOT git-add or commit. Overwriting is allowed only if smoketest.md does not already exist; if it exists with non-empty content, append a section ## Re-plan additions instead of overwriting.
+
+PHASE 7 — Signal completion.
 Print this line to the terminal: WORKFLOW_STAGE_DONE: planning
 Then create the marker file: \`touch ${join(dir, 'done', 'planning.done')}\`
 Stop.

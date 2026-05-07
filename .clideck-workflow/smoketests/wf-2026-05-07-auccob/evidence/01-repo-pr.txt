@@ -1,0 +1,18 @@
+## git remote -v
+origin	https://github.com/rustykuntz/clideck.git (fetch)
+origin	https://github.com/rustykuntz/clideck.git (push)
+plugin	https://github.com/ajhochy/clideck-workflow-plugin.git (fetch)
+plugin	https://github.com/ajhochy/clideck-workflow-plugin.git (push)
+
+## git ls-remote plugin (first 20)
+aec51baea0f3126673dc6b3ed89fd6f6dce6747b	HEAD
+072815b75a2fc3c3a6b06f330d39e8aae64d70cb	refs/heads/feat/cli-deck-3
+aec51baea0f3126673dc6b3ed89fd6f6dce6747b	refs/heads/main
+072815b75a2fc3c3a6b06f330d39e8aae64d70cb	refs/pull/1/head
+9bb9ab79496a80e008b793c0cd8a50a572d635f0	refs/pull/1/merge
+
+## gh repo view
+{"defaultBranchRef":{"name":"main"},"nameWithOwner":"ajhochy/clideck-workflow-plugin","url":"https://github.com/ajhochy/clideck-workflow-plugin"}
+
+## gh pr view
+{"baseRefName":"main","headRefName":"feat/cli-deck-3","url":"https://github.com/ajhochy/clideck-workflow-plugin/pull/1"}

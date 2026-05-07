@@ -1,0 +1,39 @@
+## runner logger source matches
+5:const { createLogger } = require('./logger');
+20:  const wfLog = createLogger({ dir, stage: 'runner' });
+29:    try { wfLog.event('stage_spawn_attempt', { stage: s.currentStage, fixAttempts: s.fixAttempts?.length || 0 }); } catch {}
+44:    try { wfLog.prompt(`stage:${s.currentStage}`, prompt); } catch {}
+45:    try { wfLog.event('stage_session_created', { stage: s.currentStage, sessionId: sid, presetId: stage.preset || 'claude-code' }); } catch {}
+47:    try {
+48:      const stageLog = createLogger({ dir, stage: s.currentStage });
+49:      const stream = stageLog.openSessionStream(sid, s.currentStage);
+56:      setTimeout(() => { try { api.inputToSession(sid, prompt); } catch {} }, 4000);
+57:      setTimeout(() => { try { api.inputToSession(sid, '\r'); } catch {} }, 4250);
+71:      try { failureText = require('node:fs').readFileSync(failureFile, 'utf8'); } catch {}
+75:        try { wfLog.event('stage_failed', { stage, failureText, retryDecision: 'give-up' }); } catch {}
+76:        try { wfLog.error(new Error(failureText)); } catch {}
+79:        try { sessionStreams.get(sid)?.close({ stage }); sessionStreams.delete(sid); } catch {}
+83:      try { wfLog.event('stage_failed', { stage, failureText, retryDecision: 'retry' }); } catch {}
+84:      try { wfLog.error(new Error(failureText)); } catch {}
+89:      try { unlinkSync(failureFile); } catch {}
+92:      try { sessionStreams.get(sid)?.close({ stage }); sessionStreams.delete(sid); } catch {}
+111:        const willRetry = fixmod.shouldRetry(s, maxFixAttempts);
+112:        try { wfLog.event('smoketest_failed', { willRetry }); } catch {}
+113:        if (willRetry) {
+114:          try { sessionStreams.get(sid)?.close({ stage: stageDone }); sessionStreams.delete(sid); } catch {}
+117:            try { unlinkSync(join(dir, 'done', `${m}.done`)); } catch {}
+125:        try { sessionStreams.get(sid)?.close({ stage: stageDone }); sessionStreams.delete(sid); } catch {}
+130:      try { sessionStreams.get(sid)?.close({ stage: stageDone }); sessionStreams.delete(sid); } catch {}
+132:      try { wfLog.event('stage_done', { from: stageDone, to: done.currentStage }); } catch {}
+148:    try { sessionStreams.get(sid)?.close({ stage: stageDone }); sessionStreams.delete(sid); } catch {}
+149:    try { wfLog.event('stage_done', { from: stageDone, to: updated.currentStage }); } catch {}
+
+## index session-output logging matches
+13:const { createLogger } = require('./lib/logger');
+47:    // Key: `${wfId}:${sid}` → stream object from openSessionStream.
+55:    api.onSessionOutput((sid, data) => {
+70:            const stageLogger = createLogger({ dir: entry.dir, stage: currentStage });
+71:            stream = stageLogger.openSessionStream(sid, currentStage);
+74:          stream.onData(data);
+119:            if (stream) { stream.close({}); relayStreams.delete(streamKey); }
+204:            if (stream) { stream.close({}); relayStreams.delete(streamKey); }

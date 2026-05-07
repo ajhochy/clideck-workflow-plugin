@@ -1,0 +1,61 @@
+## summary unit tests
+TAP version 13
+# Subtest: summary uses plain language and covers ask, built, manual, verified, broken
+ok 1 - summary uses plain language and covers ask, built, manual, verified, broken
+  ---
+  duration_ms: 2.148791
+  type: 'test'
+  ...
+# Subtest: summary surfaces failures clearly when smoketest failed
+ok 2 - summary surfaces failures clearly when smoketest failed
+  ---
+  duration_ms: 0.186584
+  type: 'test'
+  ...
+# Subtest: writeSummary creates summary.md on first call
+ok 3 - writeSummary creates summary.md on first call
+  ---
+  duration_ms: 0.927834
+  type: 'test'
+  ...
+# Subtest: writeSummary second call creates summary.run2.md; summary.md is untouched
+ok 4 - writeSummary second call creates summary.run2.md; summary.md is untouched
+  ---
+  duration_ms: 0.80175
+  type: 'test'
+  ...
+# Subtest: writeSummary third call creates summary.run3.md
+ok 5 - writeSummary third call creates summary.run3.md
+  ---
+  duration_ms: 1.428084
+  type: 'test'
+  ...
+# Subtest: nextSummaryFilename returns run4 when run2 is deleted but run3 exists
+ok 6 - nextSummaryFilename returns run4 when run2 is deleted but run3 exists
+  ---
+  duration_ms: 0.882166
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 52.646209
+
+## summary smoke script
+{
+  "dir": "/var/folders/f0/kwf9lqtx57qgt3j4rbtvg1ym0000gn/T/tmp.zknPmU1Cbv",
+  "first": "summary.md",
+  "second": "summary.run2.md",
+  "third": "summary.run3.md",
+  "nextAfterGap": "summary.run4.md",
+  "files": [
+    "summary.md",
+    "summary.run3.md"
+  ],
+  "summaryText": "first\n"
+}

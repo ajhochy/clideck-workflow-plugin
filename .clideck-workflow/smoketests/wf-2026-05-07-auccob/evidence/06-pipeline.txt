@@ -1,0 +1,27 @@
+## pipeline unit tests
+TAP version 13
+# Subtest: pipeline prompt covers worktree-per-issue, CI watch, draft PR after first commit, manual setup + Rhythm task
+ok 1 - pipeline prompt covers worktree-per-issue, CI watch, draft PR after first commit, manual setup + Rhythm task
+  ---
+  duration_ms: 0.669083
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 49.5955
+
+## pipeline prompt source matches
+5:  const summaryJsPath = path.resolve(__dirname, '..', 'summary.js');
+25:You will open the Draft PR after the FIRST issue's first commit lands. Do not open it earlier (an empty PR is noise). Title = "${s.title || s.id}". Body = the current contents of .clideck-workflow/summaries/${s.id}-summary.md (will be created in Step 7) — for now, a placeholder "Workflow ${s.id} — in progress".
+52:Regenerate the summary (basic version: Description, Issues completed, Manual setup needed).
+53:a. Ensure the directory exists: \`mkdir -p .clideck-workflow/summaries\`
+54:b. Write the summary to the project repo: \`.clideck-workflow/summaries/${s.id}-summary.md\`
+55:c. Also write a workflow-folder copy via writeSummary from summary.js:
+57:   node -e "const {writeSummary}=require('${summaryJsPath}'); const fs=require('fs'); writeSummary('${dir}', fs.readFileSync('.clideck-workflow/summaries/${s.id}-summary.md','utf8'))"
+59:d. Update PR body: \`gh pr edit <num> --body-file .clideck-workflow/summaries/${s.id}-summary.md\`

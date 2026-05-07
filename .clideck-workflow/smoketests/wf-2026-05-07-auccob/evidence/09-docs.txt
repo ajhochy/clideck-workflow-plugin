@@ -1,0 +1,13 @@
+## documentation source matches
+README.md:95:The workflow plugin has a dedicated canonical home at **https://github.com/ajhochy/clideck-workflow-plugin**.
+plugins/workflow/docs/logging.md:3:## Logging
+plugins/workflow/docs/logging.md:13:| `events.log` | JSONL | Workflow-wide event stream. Every `logger.event()` call appends one JSON line regardless of stage. |
+plugins/workflow/docs/logging.md:14:| `{stage}.log` | JSONL | Per-stage event stream. Same data as `events.log` but filtered to a single stage. |
+plugins/workflow/docs/logging.md:26:2. **Second write** — file is named `summary.run2.md`. `summary.md` is left untouched.
+plugins/workflow/docs/logging.md:34:.clideck-workflow/summaries/{workflowId}-summary.md
+plugins/workflow/docs/logging.md:43:The `planning` stage is responsible for producing the smoketest document. It does so in **Phase 6**, just before writing the completion signal marker. The output is written to:
+plugins/workflow/docs/logging.md:46:{workflowDir}/smoketest.md
+plugins/workflow/docs/logging.md:49:The `smoketest` stage consumes this file rather than generating it. It loads `smoketest.md` at startup, executes the checklist (including any cross-app checks), and writes its result marker when finished. If `smoketest.md` is absent when the smoketest stage runs, the stage should treat it as a configuration error rather than generating a new checklist from scratch.
+
+## plugins/workflow/README.md presence
+plugins/workflow/README.md not present; using plugins/workflow/docs/logging.md
