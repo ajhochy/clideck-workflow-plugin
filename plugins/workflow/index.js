@@ -10,6 +10,7 @@ const rhythm = require('./lib/rhythm');
 const summaryMod = require('./lib/summary');
 const { createPrModule } = require('./lib/pr');
 const resume = require('./lib/resume');
+const { createLogger } = require('./lib/logger');
 
 function runGh(args, cwd) {
   return new Promise((resolve, reject) => {
@@ -42,6 +43,10 @@ module.exports = {
     api._workflowCtx = ctx; // for tests
     api.log('Workflow plugin initialized');
 
+    // Per-workflow-per-session log streams for file capture.
+    // Key: `${wfId}:${sid}` → stream object from openSessionStream.
+    const relayStreams = new Map();
+
     // Relay output from each workflow's active stage session to the panel so
     // questions/decisions surface in the panel chat box, not only in the
     // terminal. Strip ANSI to keep the panel readable.
@@ -53,6 +58,24 @@ module.exports = {
         const text = stripAnsi(data);
         if (!text) return;
         api.sendToFrontend('agent-output', { id: wfId, text });
+
+        // Per-chunk file capture — lazily open a stream on the first chunk for
+        // this sid, then append every chunk. Must never throw out of the relay.
+        try {
+          const streamKey = `${wfId}:${sid}`;
+          let stream = relayStreams.get(streamKey);
+          if (!stream) {
+            const wfState = state.read(entry.dir);
+            const currentStage = wfState.currentStage || 'unknown';
+            const stageLogger = createLogger({ dir: entry.dir, stage: currentStage });
+            stream = stageLogger.openSessionStream(sid, currentStage);
+            relayStreams.set(streamKey, stream);
+          }
+          stream.onData(data);
+        } catch (_) {
+          // Intentionally swallowed — logging must never disrupt the relay.
+        }
+
         return;
       }
     });
@@ -89,6 +112,12 @@ module.exports = {
         closeSession: (sid) => {
           const entry = ctx.workflows.get(id);
           if (entry?.activeSession === sid) entry.activeSession = null;
+          // Close the relay stream for this session, if one was opened.
+          try {
+            const streamKey = `${id}:${sid}`;
+            const stream = relayStreams.get(streamKey);
+            if (stream) { stream.close({}); relayStreams.delete(streamKey); }
+          } catch (_) {}
           return api.closeSession(sid);
         },
       };
@@ -168,6 +197,12 @@ module.exports = {
         closeSession: (sid) => {
           const entry = ctx.workflows.get(id);
           if (entry?.activeSession === sid) entry.activeSession = null;
+          // Close the relay stream for this session, if one was opened.
+          try {
+            const streamKey = `${id}:${sid}`;
+            const stream = relayStreams.get(streamKey);
+            if (stream) { stream.close({}); relayStreams.delete(streamKey); }
+          } catch (_) {}
           return api.closeSession(sid);
         },
       };
