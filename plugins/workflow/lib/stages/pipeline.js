@@ -1,6 +1,8 @@
 const { join } = require('node:path');
+const path = require('node:path');
 
 function build(s, dir) {
+  const summaryJsPath = path.resolve(__dirname, '..', 'summary.js');
   const stageName = 'pipeline';
   const retryContext = (s.stageFailures?.[stageName]?.length)
     ? `\nPRIOR ATTEMPT FAILED — address these failures before continuing:\n${s.stageFailures[stageName].join('\n---\n')}\n`
@@ -20,7 +22,7 @@ If state.branch does not exist locally, create it from the project's default bra
 Push the branch.
 
 STEP 3 — Draft PR after first commit.
-You will open the Draft PR after the FIRST issue's first commit lands. Do not open it earlier (an empty PR is noise). Title = "${s.title || s.id}". Body = the current contents of summary.md (will be created in Step 6) — for now, a placeholder "Workflow ${s.id} — in progress".
+You will open the Draft PR after the FIRST issue's first commit lands. Do not open it earlier (an empty PR is noise). Title = "${s.title || s.id}". Body = the current contents of .clideck-workflow/summaries/${s.id}-summary.md (will be created in Step 7) — for now, a placeholder "Workflow ${s.id} — in progress".
 Use \`gh pr create --draft\`. Save number+url to state.pr.
 
 STEP 4 — For each issue, in order:
@@ -47,7 +49,14 @@ STEP 6 — Create Rhythm task (if available).
 The plugin sets state.rhythmAvailable = true|false at init. If available, use the Rhythm MCP tool \`create-task\` with title "Manual setup for Workflow ${s.id}: ${s.title || ''}" and a checklist body built from manualSetup. Save id+url to state.rhythmTask. If unavailable, leave state.rhythmTask null — the plugin shows a banner.
 
 STEP 7 — Update PR body.
-Regenerate summary.md (basic version: Description, Issues completed, Manual setup needed). Push it on the branch. Update PR body to the file contents via \`gh pr edit <num> --body-file summary.md\`.
+Regenerate the summary (basic version: Description, Issues completed, Manual setup needed).
+a. Ensure the directory exists: \`mkdir -p .clideck-workflow/summaries\`
+b. Write the summary to the project repo: \`.clideck-workflow/summaries/${s.id}-summary.md\`
+c. Also write a workflow-folder copy via writeSummary from summary.js:
+   \`\`\`
+   node -e "const {writeSummary}=require('${summaryJsPath}'); const fs=require('fs'); writeSummary('${dir}', fs.readFileSync('.clideck-workflow/summaries/${s.id}-summary.md','utf8'))"
+   \`\`\`
+d. Update PR body: \`gh pr edit <num> --body-file .clideck-workflow/summaries/${s.id}-summary.md\`
 
 STEP 8 — Signal completion.
 Print: WORKFLOW_STAGE_DONE: pipeline
