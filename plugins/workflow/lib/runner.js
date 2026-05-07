@@ -3,8 +3,10 @@ const { join } = require('node:path');
 const state = require('./state');
 const fixmod = require('./fix-subworkflow');
 const { createLogger } = require('./logger');
+const { pollPrChecks } = require('./ci-poller');
 
 const SEQUENCE = ['planning', 'issues', 'pipeline', 'smoketest'];
+const MAX_CI_RETRIES_PER_ISSUE = 3;
 
 function nextStage(current) {
   const i = SEQUENCE.indexOf(current);
@@ -58,6 +60,82 @@ function createRunner({ dir, api, stages, onAdvance = () => {}, lockFor = null, 
     }
   }
 
+  async function handleStepDone() {
+    // Clear marker first so we don't re-trigger on the next watch event.
+    try { unlinkSync(join(dir, 'done', 'step.done')); } catch {}
+
+    // Close the per-step agent session — its work is done. The next pipeline invocation gets a fresh session.
+    const sid = currentSession;
+    if (currentSession) { try { api.closeSession(currentSession); } catch {} }
+    try { sessionStreams.get(sid)?.close({ stage: 'pipeline-step' }); sessionStreams.delete(sid); } catch {}
+    currentSession = null;
+    if (currentLock) { currentLock.release(); currentLock = null; }
+
+    const s0 = state.read(dir);
+    const pushed = (s0.issues || []).find((i) => i.status === 'pushed');
+    if (!pushed) {
+      // Nothing pushed → nothing to verify. Re-spawn pipeline; build() will branch to finalize if all done.
+      spawnCurrentStage();
+      return;
+    }
+
+    const repo = s0.githubRepo;
+    const prNum = s0.pr?.number;
+    if (!repo || !prNum) {
+      // No PR yet (very first commit may have just landed without one) or no repo — mark step done optimistically.
+      state.update(dir, (c) => {
+        const i = c.issues.find((x) => x.number === pushed.number);
+        if (i) { i.status = 'done'; }
+      });
+      spawnCurrentStage();
+      return;
+    }
+
+    try { wfLog.event('ci_poll_start', { issue: pushed.number, pr: prNum, repo }); } catch {}
+    const result = await pollPrChecks({
+      prNumber: prNum,
+      repo,
+      onPoll: (snap) => { try { wfLog.event('ci_poll', { issue: pushed.number, snap }); } catch {} },
+    });
+    try { wfLog.event('ci_poll_done', { issue: pushed.number, result: result.state }); } catch {}
+
+    if (result.state === 'passed' || result.state === 'no-checks') {
+      state.update(dir, (c) => {
+        const i = c.issues.find((x) => x.number === pushed.number);
+        if (i) {
+          i.status = 'done';
+          delete i.lastCiFailure;
+        }
+      });
+      spawnCurrentStage();
+      return;
+    }
+
+    if (result.state === 'failed') {
+      const updated = state.update(dir, (c) => {
+        const i = c.issues.find((x) => x.number === pushed.number);
+        if (!i) return;
+        i.ciAttempts = (i.ciAttempts || 0) + 1;
+        if (i.ciAttempts >= MAX_CI_RETRIES_PER_ISSUE) {
+          i.status = 'failed';
+        } else {
+          i.status = 'fix-needed';
+          i.lastCiFailure = { failed: result.failed?.map((f) => ({ name: f.name, link: f.link })) || [], at: new Date().toISOString() };
+        }
+      });
+      const issue = updated.issues.find((x) => x.number === pushed.number);
+      if (issue?.status === 'failed') {
+        require('node:fs').writeFileSync(join(dir, 'done', 'pipeline.failed'), `Issue ${issue.number} (${issue.title || ''}) exceeded CI retry budget (${MAX_CI_RETRIES_PER_ISSUE}).`);
+        return;
+      }
+      spawnCurrentStage();
+      return;
+    }
+
+    // Timeout — treat as failure.
+    require('node:fs').writeFileSync(join(dir, 'done', 'pipeline.failed'), `CI poll timed out for PR ${prNum} on issue ${pushed.number}.`);
+  }
+
   function handleMarker(filename) {
     if (!filename) return;
     // Ignore deletion events — only act when the file actually exists.
@@ -65,6 +143,15 @@ function createRunner({ dir, api, stages, onAdvance = () => {}, lockFor = null, 
 
     if (filename.endsWith('.failed')) {
       const stage = filename.slice(0, -'.failed'.length);
+      // Per-step agent self-reported failure → treat as pipeline failure.
+      if (stage === 'step') {
+        const failureFile = join(dir, 'done', filename);
+        let failureText = '';
+        try { failureText = require('node:fs').readFileSync(failureFile, 'utf8'); } catch {}
+        try { unlinkSync(failureFile); } catch {}
+        require('node:fs').writeFileSync(join(dir, 'done', 'pipeline.failed'), failureText || 'per-step agent reported failure');
+        return;
+      }
       if (stage === 'smoketest') return; // smoketest uses fix loop-back
       const failureFile = join(dir, 'done', filename);
       let failureText = '';
@@ -98,6 +185,12 @@ function createRunner({ dir, api, stages, onAdvance = () => {}, lockFor = null, 
 
     if (!filename.endsWith('.done')) return;
     const stageDone = filename.slice(0, -'.done'.length);
+
+    // Per-step pipeline marker — agent did one issue and exited; runner now polls CI.
+    if (stageDone === 'step') {
+      handleStepDone();
+      return;
+    }
 
     // Smoketest is special — branch on result.
     if (stageDone === 'smoketest') {

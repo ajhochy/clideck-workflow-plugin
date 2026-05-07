@@ -1,6 +1,12 @@
 const { join } = require('node:path');
 const path = require('node:path');
 
+function pickNextIssue(issues) {
+  if (!Array.isArray(issues)) return null;
+  const ordered = [...issues].sort((a, b) => (a.order || 0) - (b.order || 0));
+  return ordered.find((i) => i.status !== 'done') || null;
+}
+
 function build(s, dir) {
   const summaryJsPath = path.resolve(__dirname, '..', 'summary.js');
   const pluginRoot = path.resolve(__dirname, '..', '..');
@@ -8,71 +14,88 @@ function build(s, dir) {
   const retryContext = (s.stageFailures?.[stageName]?.length)
     ? `\nPRIOR ATTEMPT FAILED — address these failures before continuing:\n${s.stageFailures[stageName].join('\n---\n')}\n`
     : '';
-  const issuesLen = Array.isArray(s.issues) ? s.issues.length : 0;
-  const progressBlock = issuesLen > 0 ? `
-PROGRESS REPORTING
-(a) IMMEDIATELY at the start of this stage, initialize progress: \`node ${pluginRoot}/bin/report-progress.js ${dir} pipeline 0 ${issuesLen} "starting"\`.
-(b) After each issue is fully closed in STEP 4 (after substep f, gh issue close), bump: \`node ${pluginRoot}/bin/report-progress.js ${dir} pipeline <issuesCompleted> ${issuesLen} "issue <number>: <title>"\`.
-(c) For non-issue steps (STEP 5/6/7), keep current at ${issuesLen} and update only the label (e.g. "manual setup", "rhythm task", "pr summary").
-Do NOT skip a bump — this drives the UI progress bar.
-` : '';
-  return `You are the pipeline orchestrator for CliDeck Workflow ${s.id}.
+
+  const next = pickNextIssue(s.issues);
+  if (next) return buildStepPrompt({ s, dir, issue: next, retryContext, pluginRoot });
+  return buildFinalizePrompt({ s, dir, retryContext, summaryJsPath });
+}
+
+function buildStepPrompt({ s, dir, issue, retryContext, pluginRoot }) {
+  const ciFailureCtx = (issue.status === 'fix-needed' && issue.lastCiFailure)
+    ? `\nCI FAILED on the previous push for this step. Failed checks: ${JSON.stringify(issue.lastCiFailure.failed?.map((f) => f.name) || [])}. Read the failure logs (\`gh run view <run-id> --log-failed --repo ${s.githubRepo}\` or follow the link in state.issues[*].lastCiFailure), fix the cause, re-verify, then commit + push the fix.\n`
+    : '';
+
+  return `You are the per-step pipeline worker for CliDeck Workflow ${s.title || s.id}.
+You execute EXACTLY ONE plan step, then exit. The runner will spawn you again for the next step. Do not loop.
 
 CONTEXT FILE: ${join(dir, 'state.json')}
-Read it. You will use \`issues\`, \`branch\`, \`githubRepo\`.
-${retryContext}${progressBlock}
+THIS STEP: state.issues entry with order=${issue.order}, number=${issue.number}, title="${issue.title || ''}".
+${retryContext}${ciFailureCtx}
 
-STEP 1 — Confirm issue order.
-Read \`issues\`. Verify topological order against \`dependencies\`. Re-order if needed and write back.
+STEP A — Set up the working tree.
+- If you do not already have a worktree for this branch, ensure it exists: \`git worktree add ../wt-${s.id}-${issue.number} ${s.branch}\` (or work in the existing checkout if the branch is already checked out elsewhere).
+- cd into that worktree.
 
-STEP 2 — Branch.
-If state.branch does not exist locally, create it from the project's default branch (origin/main or origin/master).
-\`git checkout -b ${s.branch || '<state.branch>'} origin/<default-branch>\`
-Push the branch.
+STEP B — Implement the change.
+The atomic step body is in state.issues entries — read \`body\` for this issue. Implement exactly what it specifies (file paths, function names, expected behavior, dependencies, coherence rules).
 
-STEP 3 — Draft PR after first commit.
-You will open the Draft PR after the FIRST issue's first commit lands. Do not open it earlier (an empty PR is noise). Title = "${s.title || s.id}". Body = the current contents of .clideck-workflow/summaries/${s.id}-summary.md (will be created in Step 7) — for now, a placeholder "Workflow ${s.id} — in progress".
-Use \`gh pr create --draft\`. Save number+url to state.pr.
+STEP C — Verify locally before committing. This is a hard gate — do not commit unverified work.
+Choose verification based on project type:
+- npm/pnpm/yarn project → \`npm test\` (or pnpm/yarn equivalent), \`npm run lint\` / \`tsc --noEmit\` / \`npm run typecheck\` if defined, \`npm run build\` if defined.
+- python → pytest / mypy / ruff as available.
+- go → \`go test ./...\` and \`go vet ./...\`.
+- rust → \`cargo test\` and \`cargo clippy\`.
+- static web assets only → \`python3 -m http.server\` on a free port + headless Chrome via DevTools Protocol; capture console errors and failed network requests; screenshot. Save evidence under \`pipeline-evidence/issue-${issue.number}/\`.
+- otherwise → eyeball the change and record what you checked.
+A failure here BLOCKS the commit. Fix and re-run before proceeding.
 
-STEP 4 — For each issue, in order:
-  a. Create a worktree: \`git worktree add ../wt-${s.id}-<issue-number> <branch>\`.
-     If \`git worktree add\` fails because the branch is already checked out elsewhere, work in place in the existing checkout instead of erroring.
-  b. Dispatch a Sonnet sub-agent into that worktree with the atomic step's full context.
-  c. Sub-agent implements the change. BEFORE committing, the sub-agent MUST verify the change locally — do not commit unverified work. Verification is a hard gate, not optional. The verification steps depend on the project type:
-     - If the repo has a test command (npm test, pytest, go test, cargo test, etc. — detect from package.json / pyproject.toml / Cargo.toml / Makefile), run it. Failures block the commit.
-     - If the repo has a lint/typecheck (npm run lint, npm run typecheck, ruff, mypy, tsc, golangci-lint, etc.), run it. Errors block the commit.
-     - If the repo has a build step (npm run build, cargo build, etc.), run it. Failures block the commit.
-     - If the change touches static web assets (HTML/CSS/JS/index.html), serve the repo with \`python3 -m http.server\` on a free port, drive headless Chrome at that URL via DevTools Protocol, capture console errors and any failed network requests, and screenshot the page. Any console error or failed request blocks the commit. Save evidence under \`pipeline-evidence/issue-<n>/\`.
-     - If none of the above apply, run the change manually (open the file, eyeball, exec the script if it's a script) and record what was checked.
-     The sub-agent writes a one-paragraph "Verified by:" note into the commit message body listing exactly what it ran and what passed.
-  d. Sub-agent commits with subject "feat(<issue-number>): <title>" and the verification note in the body, then pushes.
-  e. After push, watch CI: \`gh pr checks <pr-number> --watch\`. If CI fails, instruct sub-agent to read the failure logs, fix, re-verify (step c), commit, push. Bound to 3 retries; if still red, mark issue blocked and stop the pipeline (signals self-heal at the plugin level).
-  f. On green: \`gh issue close <issue-number> --comment "Completed in #<pr-number>"\`.
-  g. Remove the worktree: \`git worktree remove ../wt-${s.id}-<issue-number>\` (skip if you worked in place in step a).
+STEP D — Commit + push.
+Subject: \`feat(${issue.number}): ${(issue.title || '').replace(/`/g, "'")}\`
+Body MUST include a one-paragraph "Verified by:" note listing the exact commands you ran in step C and that they passed.
+Push to ${s.branch} on the \`plugin\` remote: \`git push plugin ${s.branch}\`.
 
-STEP 5 — Gather manual setup.
-After all issues land, scan the diff and the issue bodies for setup that requires a human (API keys, env vars, GitHub Actions secrets, third-party webhooks, DNS, etc.). Write a list to state.manualSetup as:
-[ { "title": "Generate Stripe API key", "steps": ["Log into Stripe", "...", "Add to .env as STRIPE_KEY"] }, ... ]
+STEP E — If this is the FIRST commit on this branch (no PR yet on state.pr), open the draft PR.
+\`gh pr create --repo ${s.githubRepo} --draft --title "${(s.title || s.id).replace(/"/g, '\\"')}" --body "Workflow ${s.title || s.id} — in progress"\`
+Save \`{number, url}\` to state.pr (use a node one-liner; do not hand-edit the JSON).
 
-STEP 6 — Create Rhythm task (if available).
-The plugin sets state.rhythmAvailable = true|false at init. If available, use the Rhythm MCP tool \`create-task\` with title "Manual setup for Workflow ${s.id}: ${s.title || ''}" and a checklist body built from manualSetup. Save id+url to state.rhythmTask. If unavailable, leave state.rhythmTask null — the plugin shows a banner.
+STEP F — Mark this issue as pushed and signal step done. DO NOT WATCH CI. The runner polls CI in Node, no LLM context needed.
+- Update state.issues[this].status = 'pushed' and append the new commit sha to state.issues[this].commits.
+- Bump progress: \`node ${pluginRoot}/bin/report-progress.js ${dir} pipeline ${(s.issues || []).filter((i) => i.status === 'done').length} ${(s.issues || []).length} "issue ${issue.number} pushed, awaiting CI"\` (use the count of \`done\` issues, not pushed — pushed is in-flight).
+- Write the marker: \`touch ${join(dir, 'done', 'step.done')}\` and EXIT.
 
-STEP 7 — Update PR body.
-Regenerate the summary (basic version: Description, Issues completed, Manual setup needed).
-a. Ensure the directory exists: \`mkdir -p .clideck-workflow/summaries\`
-b. Write the summary to the project repo: \`.clideck-workflow/summaries/${s.id}-summary.md\`
-c. Also write a workflow-folder copy via writeSummary from summary.js:
-   \`\`\`
-   node -e "const {writeSummary}=require('${summaryJsPath}'); const fs=require('fs'); writeSummary('${dir}', fs.readFileSync('.clideck-workflow/summaries/${s.id}-summary.md','utf8'))"
-   \`\`\`
-d. Update PR body: \`gh pr edit <num> --body-file .clideck-workflow/summaries/${s.id}-summary.md\`
-
-STEP 8 — Signal completion.
-Print: WORKFLOW_STAGE_DONE: pipeline
-Create marker: touch ${join(dir, 'done', 'pipeline.done')}
-
-ON FAILURE: If you cannot complete this stage successfully, write a brief failure description to ${join(dir, 'done', 'pipeline.failed')} INSTEAD of the .done marker. Then stop.
+ON FAILURE (could not implement, verification failed permanently, push rejected, etc.): write a brief failure description to ${join(dir, 'done', 'step.failed')} INSTEAD of step.done. Then stop.
 `;
 }
 
-module.exports = { preset: 'claude-code', build };
+function buildFinalizePrompt({ s, dir, retryContext, summaryJsPath }) {
+  return `You are the pipeline finalizer for CliDeck Workflow ${s.title || s.id}.
+All ${(s.issues || []).length} steps are CI-green. Wrap up the pipeline stage.
+
+CONTEXT FILE: ${join(dir, 'state.json')}
+${retryContext}
+
+STEP 1 — Gather manual setup.
+Scan the diff (${s.branch} vs origin default branch) and the issue bodies for setup that requires a human (API keys, env vars, GitHub Actions secrets, third-party webhooks, DNS, etc.). Write the list to state.manualSetup as:
+[ { "title": "Generate Stripe API key", "steps": ["...", "..."] }, ... ]
+
+STEP 2 — Create Rhythm task (if available).
+If state.rhythmAvailable is true, use the Rhythm MCP \`create-task\` tool with title "Manual setup for Workflow ${s.id}: ${s.title || ''}" and a checklist body built from state.manualSetup. Save \`{id, url}\` to state.rhythmTask. If unavailable, leave state.rhythmTask null.
+
+STEP 3 — Write the summary.
+- \`mkdir -p .clideck-workflow/summaries\`
+- Write the summary to \`.clideck-workflow/summaries/${s.id}-summary.md\` (Description, Issues completed with PR commit shas, Manual setup needed).
+- Mirror to the workflow folder:
+  \`\`\`
+  node -e "const {writeSummary}=require('${summaryJsPath}'); const fs=require('fs'); writeSummary('${dir}', fs.readFileSync('.clideck-workflow/summaries/${s.id}-summary.md','utf8'))"
+  \`\`\`
+- Update PR body: \`gh pr edit <state.pr.number> --repo ${s.githubRepo} --body-file .clideck-workflow/summaries/${s.id}-summary.md\`
+
+STEP 4 — Signal completion.
+Print: WORKFLOW_STAGE_DONE: pipeline
+Create marker: \`touch ${join(dir, 'done', 'pipeline.done')}\`
+
+ON FAILURE: write a brief failure description to ${join(dir, 'done', 'pipeline.failed')} instead.
+`;
+}
+
+module.exports = { preset: 'claude-code', build, pickNextIssue };
