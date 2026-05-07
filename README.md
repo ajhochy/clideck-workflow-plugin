@@ -2,7 +2,21 @@
   <img src="public/img/clideck-logo-icon.png" width="64" alt="clideck logo">
 </p>
 
-<h1 align="center">clideck</h1>
+<h1 align="center">my-clideck</h1>
+
+<p align="center"><strong>A personal downstream fork of <a href="https://github.com/rustykuntz/clideck">rustykuntz/clideck</a>.</strong></p>
+
+> **What this repo is:** my personal copy of [CliDeck](https://github.com/rustykuntz/clideck) with extra plugins and customizations baked in. It is **not** a standalone plugin package and **not** the canonical `clideck` you install from npm.
+>
+> **Upstream:** [rustykuntz/clideck](https://github.com/rustykuntz/clideck) — pulled in via the `origin` remote so I can rebase/merge upstream changes when I want them.
+>
+> **This fork:** pushed to the `plugin` remote (this repo). All my work lives here; nothing flows back upstream.
+>
+> **What's added beyond upstream:** a `workflow` plugin under `plugins/workflow/` plus assorted personal tweaks. The other plugins (`autopilot`, `trim-clip`, `voice-input`) are upstream's.
+>
+> If you're looking for the real CliDeck, go [here](https://github.com/rustykuntz/clideck) or `npm install -g clideck`.
+
+---
 
 <p align="center">
   one screen for AI coding agents.
@@ -89,12 +103,6 @@ Guides, agent setup, plugin development: **[docs.clideck.dev](https://docs.clide
 ## Acknowledgments
 
 Built with [xterm.js](https://xtermjs.org/).
-
-## Dedicated plugin repo
-
-The workflow plugin has a dedicated canonical home at **https://github.com/ajhochy/clideck-workflow-plugin**.
-
-Changes are still authored from inside this clideck monorepo worktree until a later extraction milestone. The `plugin` git remote in this worktree points at the dedicated repo, so commits on `feat/cli-deck-3` are pushed there via `git push plugin`.
 
 ## License
 
