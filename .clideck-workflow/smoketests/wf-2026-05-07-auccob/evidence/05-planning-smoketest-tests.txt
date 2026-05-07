@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: planning prompt includes state path, description, and instructs codebase exploration before Q&A
+ok 1 - planning prompt includes state path, description, and instructs codebase exploration before Q&A
+  ---
+  duration_ms: 0.591792
+  type: 'test'
+  ...
+# Subtest: planning uses claude-code preset and instructs Opus model in prompt body
+ok 2 - planning uses claude-code preset and instructs Opus model in prompt body
+  ---
+  duration_ms: 0.15
+  type: 'test'
+  ...
+# Subtest: planning prompt includes smoketest.md authoring phase before signal completion
+ok 3 - planning prompt includes smoketest.md authoring phase before signal completion
+  ---
+  duration_ms: 0.126417
+  type: 'test'
+  ...
+# Subtest: smoketest prompt instructs codex to load existing smoketest.md, execute checklist with cross-app checks, and write result
+ok 4 - smoketest prompt instructs codex to load existing smoketest.md, execute checklist with cross-app checks, and write result
+  ---
+  duration_ms: 0.617708
+  type: 'test'
+  ...
+# Subtest: preset is codex
+ok 5 - preset is codex
+  ---
+  duration_ms: 0.069584
+  type: 'test'
+  ...
+# Subtest: extraArgs contains bypass flag
+ok 6 - extraArgs contains bypass flag
+  ---
+  duration_ms: 0.074542
+  type: 'test'
+  ...
+# Subtest: smoketest prompt creates marker file as final step
+ok 7 - smoketest prompt creates marker file as final step
+  ---
+  duration_ms: 0.067583
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 51.266167

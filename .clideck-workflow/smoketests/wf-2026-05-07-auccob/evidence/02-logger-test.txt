@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: event() appends a parseable JSON line to {stage}.log and events.log
+ok 1 - event() appends a parseable JSON line to {stage}.log and events.log
+  ---
+  duration_ms: 6.268791
+  type: 'test'
+  ...
+# Subtest: prompt() writes a plain-text section containing header and text body to {stage}.prompt.log
+ok 2 - prompt() writes a plain-text section containing header and text body to {stage}.prompt.log
+  ---
+  duration_ms: 1.587459
+  type: 'test'
+  ...
+# Subtest: error() writes to errors.log with stack field and is parseable JSON
+ok 3 - error() writes to errors.log with stack field and is parseable JSON
+  ---
+  duration_ms: 1.753083
+  type: 'test'
+  ...
+# Subtest: openSessionStream() onData appends string and Buffer chunks in order; close() writes footer; close() twice does not duplicate footer
+ok 4 - openSessionStream() onData appends string and Buffer chunks in order; close() writes footer; close() twice does not duplicate footer
+  ---
+  duration_ms: 1.16525
+  type: 'test'
+  ...
+# Subtest: Logger creates {dir}/logs/ automatically when it does not exist
+ok 5 - Logger creates {dir}/logs/ automatically when it does not exist
+  ---
+  duration_ms: 1.818292
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 61.97325
