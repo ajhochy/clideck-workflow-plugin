@@ -1,10 +1,24 @@
 const { join } = require('node:path');
+const { execFile } = require('node:child_process');
+const { writeFileSync } = require('node:fs');
 const state = require('./lib/state');
 const wf = require('./lib/workflow-folder');
 const branch = require('./lib/branch');
 const { createLock } = require('./lib/smoketest-lock');
 const { createRunner } = require('./lib/runner');
 const rhythm = require('./lib/rhythm');
+const summaryMod = require('./lib/summary');
+const { createPrModule } = require('./lib/pr');
+
+function runGh(args, cwd) {
+  return new Promise((resolve, reject) => {
+    execFile('gh', args, { cwd, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+      if (err) reject(new Error(`gh ${args.join(' ')} failed: ${stderr || err.message}`));
+      else resolve(stdout);
+    });
+  });
+}
+
 const stages = {
   planning: require('./lib/stages/planning'),
   issues: require('./lib/stages/issues'),
@@ -39,6 +53,23 @@ module.exports = {
 
     api.onFrontendMessage('list', () => api.sendToFrontend('list', { workflows: listAll() }));
 
+    async function finalize(s, workflowDir) {
+      if (s.currentStage !== 'done' && s.currentStage !== 'failed') return;
+      const md = summaryMod.render(s);
+      writeFileSync(join(workflowDir, 'summary.md'), md);
+      if (s.githubRepo && s.pr?.number) {
+        const pr = createPrModule({ runGh: (args) => runGh(args) });
+        try {
+          await pr.updatePrBody({ repo: s.githubRepo, number: s.pr.number, body: md });
+          if (s.currentStage === 'done' && s.smoketestResult?.status === 'passed') {
+            await pr.markReady({ repo: s.githubRepo, number: s.pr.number });
+          }
+        } catch (e) {
+          api.log(`finalize: gh call failed for workflow ${s.id}: ${e.message}`);
+        }
+      }
+    }
+
     api.onFrontendMessage('create', (msg) => {
       const { description, title, branch: branchInput, projectId } = msg;
       if (!description || !projectId) {
@@ -71,7 +102,10 @@ module.exports = {
         dir,
         api,
         stages,
-        onAdvance: () => api.sendToFrontend('list', { workflows: listAll() }),
+        onAdvance: (s) => {
+          api.sendToFrontend('list', { workflows: listAll() });
+          finalize(s, dir).catch((e) => api.log(`finalize error: ${e.message}`));
+        },
         lockFor: (stageName, wfId) => stageName === 'smoketest' ? ctx.smoketestLock.acquire(wfId) : null,
       });
       ctx.workflows.set(id, { dir, runner });
