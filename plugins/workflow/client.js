@@ -13,6 +13,14 @@ let pendingResumables = null;
 let expandedId = null;
 let branchValidateTimer = null;
 const agentOutput = new Map(); // workflowId -> tail string (capped)
+
+function ensureProgressStyles() {
+  if (document.getElementById('wf-progress-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'wf-progress-styles';
+  style.textContent = '@keyframes wf-progress-indet { 0% { transform: translateX(-100%); } 100% { transform: translateX(380%); } }';
+  document.head.appendChild(style);
+}
 const AGENT_OUTPUT_CAP = 16384;
 
 function appendAgentOutput(id, text) {
@@ -126,10 +134,27 @@ function render(list) {
     };
 
     const titleDiv = document.createElement('div');
-    titleDiv.style.cssText = 'display:flex;justify-content:space-between;align-items:center;';
+    titleDiv.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:6px;';
     const strong = document.createElement('strong');
     strong.textContent = w.title || w.id || '(untitled)';
+    strong.style.cssText = 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
     titleDiv.appendChild(strong);
+
+    const delBtn = document.createElement('button');
+    delBtn.textContent = '✕';
+    delBtn.title = 'Delete workflow';
+    delBtn.style.cssText = 'background:transparent;border:none;color:#f87171;cursor:pointer;font-size:14px;padding:0 6px;line-height:1;opacity:0.6;';
+    delBtn.onmouseenter = () => { delBtn.style.opacity = '1'; };
+    delBtn.onmouseleave = () => { delBtn.style.opacity = '0.6'; };
+    delBtn.onclick = (e) => {
+      e.stopPropagation();
+      const label = w.title || w.id;
+      if (window.confirm(`Delete workflow "${label}"? This stops the active session and removes the workflow folder.`)) {
+        _api.send('delete', { id: w.id });
+      }
+    };
+    titleDiv.appendChild(delBtn);
+
     const chevron = document.createElement('span');
     chevron.textContent = isExpanded ? '▲' : '▼';
     chevron.style.cssText = 'font-size:10px;opacity:0.6;';
@@ -145,6 +170,34 @@ function render(list) {
     stageDiv.style.cssText = 'font-size:12px;margin-top:4px;';
     stageDiv.textContent = `Stage: ${w.currentStage || 'unknown'}`;
     row.appendChild(stageDiv);
+
+    // Progress bar (always visible until done/failed).
+    if (w.currentStage !== 'done' && w.currentStage !== 'failed') {
+      ensureProgressStyles();
+      const prog = w.stageProgress && w.stageProgress[w.currentStage];
+      const wrap = document.createElement('div');
+      if (prog && prog.total > 0) {
+        const labelLine = document.createElement('div');
+        labelLine.style.cssText = 'font-size:11px;opacity:0.8;margin-top:4px;';
+        labelLine.textContent = `${prog.current}/${prog.total} · ${prog.label || ''}`;
+        wrap.appendChild(labelLine);
+        const outer = document.createElement('div');
+        outer.style.cssText = 'background:#374151;border-radius:3px;overflow:hidden;margin-top:2px;height:6px;';
+        const inner = document.createElement('div');
+        const pct = Math.min(100, (prog.current / prog.total) * 100);
+        inner.style.cssText = `width:${pct}%;height:100%;background:#4f46e5;transition:width 250ms ease;`;
+        outer.appendChild(inner);
+        wrap.appendChild(outer);
+      } else {
+        const outer = document.createElement('div');
+        outer.style.cssText = 'background:#374151;border-radius:3px;overflow:hidden;margin-top:6px;height:6px;';
+        const inner = document.createElement('div');
+        inner.style.cssText = 'width:30%;height:100%;background-image:repeating-linear-gradient(45deg,#4f46e5,#4f46e5 6px,#312e81 6px,#312e81 12px);animation:wf-progress-indet 1.2s linear infinite;';
+        outer.appendChild(inner);
+        wrap.appendChild(outer);
+      }
+      row.appendChild(wrap);
+    }
 
     if (isExpanded) {
       const detail = document.createElement('div');

@@ -1,6 +1,8 @@
-const { join } = require('node:path');
+const path = require('node:path');
+const { join } = path;
 const { execFile } = require('node:child_process');
-const { writeFileSync } = require('node:fs');
+const fs = require('node:fs');
+const { writeFileSync } = fs;
 const state = require('./lib/state');
 const wf = require('./lib/workflow-folder');
 const branch = require('./lib/branch');
@@ -47,6 +49,28 @@ module.exports = {
     // Key: `${wfId}:${sid}` → stream object from openSessionStream.
     const relayStreams = new Map();
 
+    // Per-workflow fs.FSWatcher on state.json. Key: workflow id → FSWatcher.
+    const stateWatchers = new Map();
+    function watchStateFile(id, dir) {
+      if (stateWatchers.has(id)) return;
+      try {
+        let timer = null;
+        const watcher = fs.watch(path.join(dir, 'state.json'), { persistent: false }, () => {
+          if (timer) return;
+          timer = setTimeout(() => {
+            timer = null;
+            try {
+              api.sendToFrontend('list', { workflows: listAll() });
+            } catch (_) { /* ENOENT during deletion etc. */ }
+          }, 200);
+        });
+        watcher.on('error', () => { /* swallow ENOENT during deletion */ });
+        stateWatchers.set(id, watcher);
+      } catch (_) {
+        // state.json may not exist yet; safe to ignore
+      }
+    }
+
     // Relay output from each workflow's active stage session to the panel so
     // questions/decisions surface in the panel chat box, not only in the
     // terminal. Strip ANSI to keep the panel readable.
@@ -79,6 +103,14 @@ module.exports = {
         return;
       }
     });
+
+    // Watch state.json for any workflow already on disk, so the UI updates
+    // when a stage agent writes progress even before resume/create runs.
+    try {
+      for (const wfId of wf.listWorkflows(root)) {
+        watchStateFile(wfId, join(root, wfId));
+      }
+    } catch (_) { /* swallow */ }
 
     ctx.rhythmAvailable = false;
     rhythm.probe(api).then((ok) => {
@@ -131,6 +163,7 @@ module.exports = {
         maxFixAttempts: api.getSetting('maxFixAttempts') ?? 2,
       });
       ctx.workflows.set(id, { dir, runner });
+      watchStateFile(id, dir);
       runner.start();
       api.log(`Resumed workflow ${id} at stage ${s.currentStage}`);
     });
@@ -218,6 +251,7 @@ module.exports = {
         maxFixAttempts: api.getSetting('maxFixAttempts') ?? 2,
       });
       ctx.workflows.set(id, { dir, runner });
+      watchStateFile(id, dir);
       api.sendToFrontend('created', { id });
       api.log(`Created workflow ${id} on branch ${finalBranch}`);
       runner.start();
@@ -239,6 +273,71 @@ module.exports = {
     api.onFrontendMessage('openSession', ({ id }) => {
       const sess = ctx.workflows.get(id)?.activeSession;
       if (sess) api.sendToFrontend('focusSession', { sessionId: sess });
+    });
+
+    api.onFrontendMessage('delete', ({ id }) => {
+      if (!id) {
+        try { api.sendToFrontend('warn', { message: 'delete: missing workflow id' }); } catch (_) {}
+        return;
+      }
+      const dir = join(root, id);
+      const known = ctx.workflows.has(id) || fs.existsSync(dir);
+      if (!known) {
+        try { api.sendToFrontend('warn', { message: `delete: unknown workflow ${id}` }); } catch (_) {}
+        return;
+      }
+      const entry = ctx.workflows.get(id);
+
+      // (2) Close active session.
+      try {
+        if (entry?.activeSession) api.closeSession(entry.activeSession);
+      } catch (_) {}
+
+      // (3) Stop runner.
+      try {
+        if (entry?.runner && typeof entry.runner.stop === 'function') entry.runner.stop();
+      } catch (_) {}
+
+      // (4) Remove branch from inFlightBranches.
+      try {
+        const s = state.read(dir);
+        if (s.projectId && s.branch) {
+          const set = ctx.inFlightBranches.get(s.projectId);
+          if (set) {
+            set.delete(s.branch);
+            if (set.size === 0) ctx.inFlightBranches.delete(s.projectId);
+          }
+        }
+      } catch (_) { /* state.json may already be gone */ }
+
+      // (5) Close+remove relay streams for this workflow.
+      try {
+        const prefix = `${id}:`;
+        for (const [key, stream] of relayStreams) {
+          if (key.startsWith(prefix)) {
+            try { stream.close({}); } catch (_) {}
+            relayStreams.delete(key);
+          }
+        }
+      } catch (_) {}
+
+      // (6) Close+remove the state-watcher.
+      try {
+        const watcher = stateWatchers.get(id);
+        if (watcher) { try { watcher.close(); } catch (_) {} stateWatchers.delete(id); }
+      } catch (_) {}
+
+      // (7) Drop ctx.workflows entry.
+      try { ctx.workflows.delete(id); } catch (_) {}
+
+      // (8) rm -rf workflow folder.
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+
+      // (9) Broadcast updated list.
+      try { api.sendToFrontend('list', { workflows: listAll() }); } catch (_) {}
+
+      // (10) Log.
+      try { api.log(`Deleted workflow ${id}`); } catch (_) {}
     });
 
     api.onShutdown(() => api.log('Workflow plugin shutting down'));

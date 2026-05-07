@@ -1,10 +1,19 @@
-const { join } = require('node:path');
+const path = require('node:path');
+const { join } = path;
 
 function build(s, dir) {
+  const pluginRoot = path.resolve(__dirname, '..', '..');
   return `You are the smoketest agent for CliDeck Workflow ${s.id}. You are Codex with computer-use capability.
 
 CONTEXT FILE: ${join(dir, 'state.json')}
 Read it. You will use \`description\`, \`plan\`, \`issues\`, \`manualSetup\`, and the diff vs the base branch.
+
+PROGRESS REPORTING
+(a) After STEP 1 (loading smoketest.md), count checklist items by counting lines matching the regex \`^\\s*-\\s*\\[ \\]\` in smoketest.md; save count as TOTAL. If TOTAL is 0, treat it as 1 (avoid divide-by-zero) and bump once at signal time.
+(b) Initialize: \`node ${pluginRoot}/bin/report-progress.js ${dir} smoketest 0 <TOTAL> "loading checklist"\`.
+(c) Inside STEP 2, after each checklist item is annotated ✅/❌, bump current and set the label to a short title for that item: \`node ${pluginRoot}/bin/report-progress.js ${dir} smoketest <itemsDone> <TOTAL> "<short item title>"\`.
+(d) For STEPs 3-4, keep current at TOTAL and update only the label (e.g. "writing result", "signal completion").
+Do NOT skip a bump — this drives the UI progress bar.
 
 STEP 1 — Load existing smoketest.md.
 Read ${join(dir, 'smoketest.md')} which was authored by the planning agent. Verify it is non-empty and contains at least one checklist item. If the file is missing or empty, write a brief failure description to ${join(dir, 'done', 'smoketest.failed')} and stop. Do NOT regenerate the file.

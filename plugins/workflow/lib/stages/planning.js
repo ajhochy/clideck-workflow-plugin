@@ -1,4 +1,5 @@
-const { join } = require('node:path');
+const path = require('node:path');
+const { join } = path;
 const fixmod = require('../fix-subworkflow');
 
 function build(s, dir) {
@@ -9,6 +10,7 @@ function build(s, dir) {
   const retryContext = (s.stageFailures?.[stageName]?.length)
     ? `\nPRIOR ATTEMPT FAILED — address these failures before continuing:\n${s.stageFailures[stageName].join('\n---\n')}\n`
     : '';
+  const pluginRoot = path.resolve(__dirname, '..', '..');
   return `You are the planning lead for CliDeck Workflow ${s.id}.
 
 MODEL: Use the Opus model for this session (planning requires deeper reasoning). If your CLI lets you switch models, switch to Opus before beginning.
@@ -18,6 +20,8 @@ Your job has 7 phases — execute them in order. Do NOT skip phases.
 CONTEXT FILE: ${join(dir, 'state.json')}
 Read it first. The user's description is the \`description\` field. Project root is whatever directory the session is running in.
 ${retryContext}
+PROGRESS REPORTING
+Throughout this stage, after starting each phase below, run: \`node ${pluginRoot}/bin/report-progress.js ${dir} planning <currentPhaseNumber> 7 "<short label>"\`. Phases and their labels are: 1=explore, 2=clarify, 3=design, 4=write-plan, 5=write-state, 6=smoketest-md, 7=signal-completion. Do NOT skip a bump — this drives the UI progress bar.
 
 PHASE 1 — Explore the codebase.
 Dispatch Haiku subagents (use the Explore subagent or feature-dev:code-explorer skill) to thoroughly map:
