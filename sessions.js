@@ -236,6 +236,7 @@ function createProgrammatic(opts, cfg) {
   if (!cmd) return { error: 'Command not found' };
 
   const parts = parseCommand(cmd.command);
+  if (Array.isArray(opts.extraArgs) && opts.extraArgs.length) parts.push(...opts.extraArgs);
   const cwd = resolveValidDir(opts.cwd || cmd.defaultPath || cfg.defaultPath);
   const themeId = opts.themeId || cfg.defaultTheme || 'default';
   const name = opts.name || cmd.label;
