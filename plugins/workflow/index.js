@@ -42,6 +42,21 @@ module.exports = {
     api._workflowCtx = ctx; // for tests
     api.log('Workflow plugin initialized');
 
+    // Relay output from each workflow's active stage session to the panel so
+    // questions/decisions surface in the panel chat box, not only in the
+    // terminal. Strip ANSI to keep the panel readable.
+    const ANSI_RE = /\x1b\[[0-9;?]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b[=>]|[\x00-\x08\x0b\x0c\x0e-\x1f]/g;
+    function stripAnsi(s) { return String(s).replace(ANSI_RE, ''); }
+    api.onSessionOutput((sid, data) => {
+      for (const [wfId, entry] of ctx.workflows) {
+        if (entry.activeSession !== sid) continue;
+        const text = stripAnsi(data);
+        if (!text) return;
+        api.sendToFrontend('agent-output', { id: wfId, text });
+        return;
+      }
+    });
+
     ctx.rhythmAvailable = false;
     rhythm.probe(api).then((ok) => {
       ctx.rhythmAvailable = ok;

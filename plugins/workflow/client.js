@@ -12,6 +12,21 @@ let visible = false;
 let pendingResumables = null;
 let expandedId = null;
 let branchValidateTimer = null;
+const agentOutput = new Map(); // workflowId -> tail string (capped)
+const AGENT_OUTPUT_CAP = 16384;
+
+function appendAgentOutput(id, text) {
+  let buf = (agentOutput.get(id) || '') + text;
+  if (buf.length > AGENT_OUTPUT_CAP) buf = buf.slice(buf.length - AGENT_OUTPUT_CAP);
+  agentOutput.set(id, buf);
+  if (expandedId === id) {
+    const pre = document.getElementById(`wf-agent-out-${id}`);
+    if (pre) {
+      pre.textContent = buf;
+      pre.scrollTop = pre.scrollHeight;
+    }
+  }
+}
 
 const STAGE_ORDER = ['planning', 'issues', 'pipeline', 'smoketest'];
 const STAGE_LABELS = { planning: 'Planning', issues: 'Issues', pipeline: 'Pipeline', smoketest: 'Smoke test' };
@@ -167,6 +182,21 @@ function render(list) {
       if (w.currentStage === 'planning') {
         const chatWrap = document.createElement('div');
         chatWrap.style.cssText = 'margin-top:6px;';
+
+        // Live agent output (read-only)
+        const outLabel = document.createElement('div');
+        outLabel.style.cssText = 'font-size:11px;opacity:0.7;margin-bottom:4px;';
+        outLabel.textContent = 'Planning agent output:';
+        chatWrap.appendChild(outLabel);
+        const outPre = document.createElement('pre');
+        outPre.id = `wf-agent-out-${w.id}`;
+        outPre.style.cssText = 'background:#0b1220;color:#cbd5e1;border:1px solid #374151;border-radius:4px;padding:6px;font-size:11px;font-family:ui-monospace,Menlo,monospace;height:140px;overflow:auto;white-space:pre-wrap;margin:0 0 6px 0;';
+        outPre.textContent = agentOutput.get(w.id) || '';
+        outPre.onclick = (e) => e.stopPropagation();
+        chatWrap.appendChild(outPre);
+        // Scroll to bottom on initial render
+        setTimeout(() => { outPre.scrollTop = outPre.scrollHeight; }, 0);
+
         const chatLabel = document.createElement('div');
         chatLabel.style.cssText = 'font-size:11px;opacity:0.7;margin-bottom:4px;';
         chatLabel.textContent = 'Send message to planning agent:';
@@ -360,6 +390,12 @@ export function init(api) {
   // Workflow created successfully — go back to list
   api.onMessage('created', () => {
     requestList();
+  });
+
+  // Live agent output relay (planning stage chat)
+  api.onMessage('agent-output', ({ id, text }) => {
+    if (!id || !text) return;
+    appendAgentOutput(id, text);
   });
 
   // Resume prompt from backend — show in-flight workflows banner
