@@ -1,6 +1,8 @@
-const { join } = require('node:path');
+const path = require('node:path');
+const { join } = path;
 const { execFile } = require('node:child_process');
-const { writeFileSync } = require('node:fs');
+const fs = require('node:fs');
+const { writeFileSync } = fs;
 const state = require('./lib/state');
 const wf = require('./lib/workflow-folder');
 const branch = require('./lib/branch');
@@ -47,6 +49,28 @@ module.exports = {
     // Key: `${wfId}:${sid}` → stream object from openSessionStream.
     const relayStreams = new Map();
 
+    // Per-workflow fs.FSWatcher on state.json. Key: workflow id → FSWatcher.
+    const stateWatchers = new Map();
+    function watchStateFile(id, dir) {
+      if (stateWatchers.has(id)) return;
+      try {
+        let timer = null;
+        const watcher = fs.watch(path.join(dir, 'state.json'), { persistent: false }, () => {
+          if (timer) return;
+          timer = setTimeout(() => {
+            timer = null;
+            try {
+              api.sendToFrontend('list', { workflows: listAll() });
+            } catch (_) { /* ENOENT during deletion etc. */ }
+          }, 200);
+        });
+        watcher.on('error', () => { /* swallow ENOENT during deletion */ });
+        stateWatchers.set(id, watcher);
+      } catch (_) {
+        // state.json may not exist yet; safe to ignore
+      }
+    }
+
     // Relay output from each workflow's active stage session to the panel so
     // questions/decisions surface in the panel chat box, not only in the
     // terminal. Strip ANSI to keep the panel readable.
@@ -79,6 +103,14 @@ module.exports = {
         return;
       }
     });
+
+    // Watch state.json for any workflow already on disk, so the UI updates
+    // when a stage agent writes progress even before resume/create runs.
+    try {
+      for (const wfId of wf.listWorkflows(root)) {
+        watchStateFile(wfId, join(root, wfId));
+      }
+    } catch (_) { /* swallow */ }
 
     ctx.rhythmAvailable = false;
     rhythm.probe(api).then((ok) => {
@@ -131,6 +163,7 @@ module.exports = {
         maxFixAttempts: api.getSetting('maxFixAttempts') ?? 2,
       });
       ctx.workflows.set(id, { dir, runner });
+      watchStateFile(id, dir);
       runner.start();
       api.log(`Resumed workflow ${id} at stage ${s.currentStage}`);
     });
@@ -218,6 +251,7 @@ module.exports = {
         maxFixAttempts: api.getSetting('maxFixAttempts') ?? 2,
       });
       ctx.workflows.set(id, { dir, runner });
+      watchStateFile(id, dir);
       api.sendToFrontend('created', { id });
       api.log(`Created workflow ${id} on branch ${finalBranch}`);
       runner.start();
