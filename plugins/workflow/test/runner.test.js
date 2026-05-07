@@ -64,3 +64,37 @@ test('runner ignores stale marker (one for a stage already past)', async () => {
     assert.equal(state.read(dir).currentStage, 'pipeline');
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('runner waits for lockFor when entering a locked stage and releases on advance', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'wflk-'));
+  try {
+    const id = 'wf-lock';
+    const dir = initFolder(root, id);
+    const s = state.createState({ id, title: 't', description: 'd', projectId: 'p', branch: 'feat/x' });
+    s.currentStage = 'smoketest';
+    state.write(dir, s);
+
+    let releaseCount = 0;
+    let lockCalls = 0;
+    const fakeApi = {
+      createSession: () => 'sess', closeSession: () => {}, log: () => {},
+    };
+    const runner = createRunner({
+      dir, api: fakeApi,
+      stages: { smoketest: { build: () => 'S' } },
+      onAdvance: () => {},
+      lockFor: (stageName, sid) => {
+        if (stageName !== 'smoketest') return null;
+        lockCalls++;
+        return Promise.resolve({ release() { releaseCount++; } });
+      },
+    });
+    runner.start();
+    await tick(50);
+    assert.equal(lockCalls, 1, 'lockFor invoked for smoketest');
+    writeFileSync(join(dir, 'done', 'smoketest.done'), '');
+    await tick(150);
+    runner.stop();
+    assert.equal(releaseCount, 1, 'lock released when smoketest completes');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

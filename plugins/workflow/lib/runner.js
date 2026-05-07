@@ -10,15 +10,20 @@ function nextStage(current) {
   return SEQUENCE[i + 1];
 }
 
-function createRunner({ dir, api, stages, onAdvance = () => {} }) {
+function createRunner({ dir, api, stages, onAdvance = () => {}, lockFor = null }) {
   let watcher = null;
   let currentSession = null;
+  let currentLock = null;
 
-  function spawnCurrentStage() {
+  async function spawnCurrentStage() {
     const s = state.read(dir);
     if (s.currentStage === 'done' || s.currentStage === 'failed') return;
     const stage = stages[s.currentStage];
     if (!stage) return;
+    if (lockFor) {
+      const lockPromise = lockFor(s.currentStage, s.id);
+      if (lockPromise) currentLock = await lockPromise;
+    }
     const prompt = stage.build(s, dir);
     currentSession = api.createSession({
       name: `Workflow ${s.id} · ${s.currentStage}`,
@@ -39,6 +44,7 @@ function createRunner({ dir, api, stages, onAdvance = () => {} }) {
     if (updated.currentStage === before) return; // stale marker — no-op
     if (currentSession) api.closeSession(currentSession);
     currentSession = null;
+    if (currentLock) { currentLock.release(); currentLock = null; }
     onAdvance(updated);
     if (updated.currentStage !== 'done' && updated.currentStage !== 'failed') {
       spawnCurrentStage();
@@ -53,6 +59,7 @@ function createRunner({ dir, api, stages, onAdvance = () => {} }) {
   function stop() {
     if (watcher) watcher.close();
     watcher = null;
+    if (currentLock) { currentLock.release(); currentLock = null; }
   }
 
   return { start, stop };

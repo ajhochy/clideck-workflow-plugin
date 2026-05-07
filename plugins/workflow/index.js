@@ -72,6 +72,7 @@ module.exports = {
         api,
         stages,
         onAdvance: () => api.sendToFrontend('list', { workflows: listAll() }),
+        lockFor: (stageName, wfId) => stageName === 'smoketest' ? ctx.smoketestLock.acquire(wfId) : null,
       });
       ctx.workflows.set(id, { dir, runner });
       api.sendToFrontend('created', { id });
