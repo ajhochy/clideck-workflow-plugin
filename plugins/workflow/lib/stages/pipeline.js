@@ -32,7 +32,7 @@ Push the branch.
 
 STEP 3 — Draft PR after first commit.
 You will open the Draft PR after the FIRST issue's first commit lands. Do not open it earlier (an empty PR is noise). Title = "${s.title || s.id}". Body = the current contents of .clideck-workflow/summaries/${s.id}-summary.md (will be created in Step 7) — for now, a placeholder "Workflow ${s.id} — in progress".
-Use \`gh pr create --draft\`. Save number+url to state.pr.
+Use \`gh pr create --repo ${s.githubRepo} --draft\`. Save number+url to state.pr.
 
 STEP 4 — For each issue, in order:
   a. Create a worktree: \`git worktree add ../wt-${s.id}-<issue-number> <branch>\`.
@@ -46,8 +46,8 @@ STEP 4 — For each issue, in order:
      - If none of the above apply, run the change manually (open the file, eyeball, exec the script if it's a script) and record what was checked.
      The sub-agent writes a one-paragraph "Verified by:" note into the commit message body listing exactly what it ran and what passed.
   d. Sub-agent commits with subject "feat(<issue-number>): <title>" and the verification note in the body, then pushes.
-  e. After push, watch CI: \`gh pr checks <pr-number> --watch\`. If CI fails, instruct sub-agent to read the failure logs, fix, re-verify (step c), commit, push. Bound to 3 retries; if still red, mark issue blocked and stop the pipeline (signals self-heal at the plugin level).
-  f. On green: \`gh issue close <issue-number> --comment "Completed in #<pr-number>"\`.
+  e. After push, watch CI: \`gh pr checks <pr-number> --watch --repo ${s.githubRepo}\`. If CI fails, instruct sub-agent to read the failure logs, fix, re-verify (step c), commit, push. Bound to 3 retries; if still red, mark issue blocked and stop the pipeline (signals self-heal at the plugin level).
+  f. On green: \`gh issue close <issue-number> --repo ${s.githubRepo} --comment "Completed in #<pr-number>"\`.
   g. Remove the worktree: \`git worktree remove ../wt-${s.id}-<issue-number>\` (skip if you worked in place in step a).
 
 STEP 5 — Gather manual setup.
@@ -65,7 +65,7 @@ c. Also write a workflow-folder copy via writeSummary from summary.js:
    \`\`\`
    node -e "const {writeSummary}=require('${summaryJsPath}'); const fs=require('fs'); writeSummary('${dir}', fs.readFileSync('.clideck-workflow/summaries/${s.id}-summary.md','utf8'))"
    \`\`\`
-d. Update PR body: \`gh pr edit <num> --body-file .clideck-workflow/summaries/${s.id}-summary.md\`
+d. Update PR body: \`gh pr edit <num> --repo ${s.githubRepo} --body-file .clideck-workflow/summaries/${s.id}-summary.md\`
 
 STEP 8 — Signal completion.
 Print: WORKFLOW_STAGE_DONE: pipeline
