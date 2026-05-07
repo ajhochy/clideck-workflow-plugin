@@ -24,12 +24,20 @@ You will open the Draft PR after the FIRST issue's first commit lands. Do not op
 Use \`gh pr create --draft\`. Save number+url to state.pr.
 
 STEP 4 — For each issue, in order:
-  a. Create a worktree: \`git worktree add ../wt-${s.id}-<issue-number> <branch>\`
+  a. Create a worktree: \`git worktree add ../wt-${s.id}-<issue-number> <branch>\`.
+     If \`git worktree add\` fails because the branch is already checked out elsewhere, work in place in the existing checkout instead of erroring.
   b. Dispatch a Sonnet sub-agent into that worktree with the atomic step's full context.
-  c. Sub-agent implements, commits with message "feat(<issue-number>): <title>", pushes.
-  d. After push, watch CI: \`gh pr checks <pr-number> --watch\`. If CI fails, instruct sub-agent to read the failure logs, fix, commit, push. Bound to 3 retries; if still red, mark issue blocked and stop the pipeline (signals self-heal at the plugin level).
-  e. On green: \`gh issue close <issue-number> --comment "Completed in #<pr-number>"\`.
-  f. Remove the worktree: \`git worktree remove ../wt-${s.id}-<issue-number>\`.
+  c. Sub-agent implements the change. BEFORE committing, the sub-agent MUST verify the change locally — do not commit unverified work. Verification is a hard gate, not optional. The verification steps depend on the project type:
+     - If the repo has a test command (npm test, pytest, go test, cargo test, etc. — detect from package.json / pyproject.toml / Cargo.toml / Makefile), run it. Failures block the commit.
+     - If the repo has a lint/typecheck (npm run lint, npm run typecheck, ruff, mypy, tsc, golangci-lint, etc.), run it. Errors block the commit.
+     - If the repo has a build step (npm run build, cargo build, etc.), run it. Failures block the commit.
+     - If the change touches static web assets (HTML/CSS/JS/index.html), serve the repo with \`python3 -m http.server\` on a free port, drive headless Chrome at that URL via DevTools Protocol, capture console errors and any failed network requests, and screenshot the page. Any console error or failed request blocks the commit. Save evidence under \`pipeline-evidence/issue-<n>/\`.
+     - If none of the above apply, run the change manually (open the file, eyeball, exec the script if it's a script) and record what was checked.
+     The sub-agent writes a one-paragraph "Verified by:" note into the commit message body listing exactly what it ran and what passed.
+  d. Sub-agent commits with subject "feat(<issue-number>): <title>" and the verification note in the body, then pushes.
+  e. After push, watch CI: \`gh pr checks <pr-number> --watch\`. If CI fails, instruct sub-agent to read the failure logs, fix, re-verify (step c), commit, push. Bound to 3 retries; if still red, mark issue blocked and stop the pipeline (signals self-heal at the plugin level).
+  f. On green: \`gh issue close <issue-number> --comment "Completed in #<pr-number>"\`.
+  g. Remove the worktree: \`git worktree remove ../wt-${s.id}-<issue-number>\` (skip if you worked in place in step a).
 
 STEP 5 — Gather manual setup.
 After all issues land, scan the diff and the issue bodies for setup that requires a human (API keys, env vars, GitHub Actions secrets, third-party webhooks, DNS, etc.). Write a list to state.manualSetup as:
