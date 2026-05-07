@@ -13,6 +13,7 @@ let pendingResumables = null;
 let expandedId = null;
 let branchValidateTimer = null;
 const agentOutput = new Map(); // workflowId -> tail string (capped)
+const pendingDeletes = new Map(); // workflowId → { timeoutId, rowEl }
 
 function ensureProgressStyles() {
   if (document.getElementById('wf-progress-styles')) return;
@@ -149,9 +150,19 @@ function render(list) {
     delBtn.onclick = (e) => {
       e.stopPropagation();
       const label = w.title || w.id;
-      if (window.confirm(`Delete workflow "${label}"? This stops the active session and removes the workflow folder.`)) {
-        _api.send('delete', { id: w.id });
-      }
+      if (!window.confirm(`Delete workflow "${label}"? This stops the active session and removes the workflow folder.`)) return;
+      row.style.opacity = '0.5';
+      row.style.pointerEvents = 'none';
+      delBtn.textContent = '…';
+      const timeoutId = setTimeout(() => {
+        pendingDeletes.delete(w.id);
+        row.style.opacity = '';
+        row.style.pointerEvents = '';
+        delBtn.textContent = '✕';
+        if (_api.toast) _api.toast(`Delete had no response. Restart CliDeck to load the latest workflow plugin.`, { type: 'warn', duration: 6000 });
+      }, 5000);
+      pendingDeletes.set(w.id, { timeoutId, rowEl: row });
+      _api.send('delete', { id: w.id });
     };
     titleDiv.appendChild(delBtn);
 
@@ -438,6 +449,22 @@ export function init(api) {
   api.onMessage('list', (msg) => {
     const workflows = Array.isArray(msg?.workflows) ? msg.workflows : [];
     render(workflows);
+  });
+
+  api.onMessage('delete-result', ({ id, success, error }) => {
+    const pending = pendingDeletes.get(id);
+    if (pending) { clearTimeout(pending.timeoutId); pendingDeletes.delete(id); }
+    if (success) {
+      if (_api.toast) _api.toast('Workflow deleted.', { type: 'info', duration: 2500 });
+    } else {
+      if (pending?.rowEl) {
+        pending.rowEl.style.opacity = '';
+        pending.rowEl.style.pointerEvents = '';
+        const btn = pending.rowEl.querySelector('button');
+        if (btn && btn.textContent === '…') btn.textContent = '✕';
+      }
+      if (_api.toast) _api.toast(`Delete failed: ${error || 'unknown error'}`, { type: 'error', duration: 5000 });
+    }
   });
 
   // Workflow created successfully — go back to list
