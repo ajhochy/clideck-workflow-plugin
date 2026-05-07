@@ -31,10 +31,12 @@ function createRunner({ dir, api, stages, onAdvance = () => {} }) {
   function handleMarker(filename) {
     if (!filename || !filename.endsWith('.done')) return;
     const stageDone = filename.slice(0, -'.done'.length);
+    const before = state.read(dir).currentStage;
     const updated = state.update(dir, (cur) => {
-      if (cur.currentStage !== stageDone) return; // ignore stale markers
+      if (cur.currentStage !== stageDone) return;
       cur.currentStage = nextStage(cur.currentStage);
     });
+    if (updated.currentStage === before) return; // stale marker — no-op
     if (currentSession) api.closeSession(currentSession);
     currentSession = null;
     onAdvance(updated);

@@ -31,3 +31,36 @@ test('runner advances state when a marker file appears', async () => {
     assert.ok(advances.includes('issues'));
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('runner ignores stale marker (one for a stage already past)', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'wfst-'));
+  try {
+    const id = 'wf-stale';
+    const dir = initFolder(root, id);
+    const s = state.createState({ id, title: 't', description: 'd', projectId: 'p', branch: 'feat/x' });
+    s.currentStage = 'pipeline'; // already past planning
+    state.write(dir, s);
+
+    const advances = [];
+    const spawns = [];
+    const fakeApi = {
+      createSession: () => { spawns.push(1); return 'sess'; },
+      closeSession: () => {},
+      log: () => {},
+    };
+    const runner = createRunner({
+      dir, api: fakeApi,
+      stages: { pipeline: { build: () => 'P' } },
+      onAdvance: (s2) => advances.push(s2.currentStage),
+    });
+    runner.start();
+    await tick();
+    // Drop a STALE marker for planning (already past)
+    writeFileSync(join(dir, 'done', 'planning.done'), '');
+    await tick(150);
+    runner.stop();
+    assert.equal(advances.length, 0, 'no advances on stale marker');
+    assert.equal(spawns.length, 1, 'only the initial spawn');
+    assert.equal(state.read(dir).currentStage, 'pipeline');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
