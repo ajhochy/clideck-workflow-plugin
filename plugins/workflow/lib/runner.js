@@ -34,10 +34,11 @@ function createRunner({ dir, api, stages, onAdvance = () => {}, lockFor = null, 
     }
     const prompt = stage.build(s, dir);
     const sid = api.createSession({
-      name: `Workflow ${s.id} · ${s.currentStage}`,
+      name: `Workflow ${s.title || s.id} · ${s.currentStage}`,
       presetId: stage.preset || 'claude-code',
       projectId: s.projectId,
       extraArgs: stage.extraArgs || [],
+      autoFocus: false,
     });
     currentSession = sid;
 
