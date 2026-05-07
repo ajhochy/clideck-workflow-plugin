@@ -138,6 +138,32 @@ test('runner triggers fix sub-workflow on smoketest failure when retries availab
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('runner re-spawns stage once on .failed marker, then gives up on second failure', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'wfsh-'));
+  try {
+    const id = 'wf-h';
+    const dir = initFolder(root, id);
+    state.write(dir, state.createState({ id, title: 't', description: 'd', projectId: 'p', branch: 'feat/x' }));
+    const spawns = [];
+    const fakeApi = {
+      createSession: () => { spawns.push(Date.now()); return 's'; },
+      closeSession: () => {}, log: () => {},
+    };
+    const runner = createRunner({ dir, api: fakeApi, stages: {
+      planning: { build: () => 'p' }, issues: { build: () => 'i' },
+    }, onAdvance: () => {} });
+    runner.start();
+    await tick();
+    writeFileSync(join(dir, 'done', 'planning.failed'), 'first failure');
+    await tick(150);
+    assert.equal(spawns.length, 2, 'initial + 1 retry');
+    writeFileSync(join(dir, 'done', 'planning.failed'), 'second failure');
+    await tick(150);
+    runner.stop();
+    assert.equal(state.read(dir).currentStage, 'failed');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('runner marks failed when max fix attempts exceeded', async () => {
   const root = mkdtempSync(join(tmpdir(), 'wfmx-'));
   try {

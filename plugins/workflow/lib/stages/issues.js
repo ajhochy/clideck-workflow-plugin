@@ -1,10 +1,15 @@
 const { join } = require('node:path');
 
 function build(s, dir) {
+  const stageName = 'issues';
+  const retryContext = (s.stageFailures?.[stageName]?.length)
+    ? `\nPRIOR ATTEMPT FAILED — address these failures before continuing:\n${s.stageFailures[stageName].join('\n---\n')}\n`
+    : '';
   return `You are the issue-creation agent for CliDeck Workflow ${s.id}.
 
 CONTEXT FILE: ${join(dir, 'state.json')}
 Read it. You will use the \`plan\` field — its structured atomic steps are your source.
+${retryContext}
 
 STEP 1 — Detect repository.
 Run: \`gh repo view --json nameWithOwner\` (or \`git remote get-url origin\`). If a GitHub repo is detected, set state.json.githubRepo to "<owner>/<name>". Otherwise leave it null and proceed in local-TODO mode.
@@ -31,6 +36,8 @@ Schema:
 STEP 5 — Signal completion.
 Print: WORKFLOW_STAGE_DONE: issues
 Create marker: touch ${join(dir, 'done', 'issues.done')}
+
+ON FAILURE: If you cannot complete this stage successfully, write a brief failure description to ${join(dir, 'done', 'issues.failed')} INSTEAD of the .done marker. Then stop.
 `;
 }
 

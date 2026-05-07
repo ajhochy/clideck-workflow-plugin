@@ -5,12 +5,17 @@ function build(s, dir) {
   if (s.fixAttempts && s.fixAttempts.length > 0) {
     return fixmod.buildFixPrompt(s, dir);
   }
+  const stageName = 'planning';
+  const retryContext = (s.stageFailures?.[stageName]?.length)
+    ? `\nPRIOR ATTEMPT FAILED — address these failures before continuing:\n${s.stageFailures[stageName].join('\n---\n')}\n`
+    : '';
   return `You are the planning lead for CliDeck Workflow ${s.id}.
 
 Your job has 6 phases — execute them in order. Do NOT skip phases.
 
 CONTEXT FILE: ${join(dir, 'state.json')}
 Read it first. The user's description is the \`description\` field. Project root is whatever directory the session is running in.
+${retryContext}
 
 PHASE 1 — Explore the codebase.
 Dispatch Haiku subagents (use the Explore subagent or feature-dev:code-explorer skill) to thoroughly map:
@@ -41,6 +46,8 @@ PHASE 6 — Signal completion.
 Print this line to the terminal: WORKFLOW_STAGE_DONE: planning
 Then create the marker file: \`touch ${join(dir, 'done', 'planning.done')}\`
 Stop.
+
+ON FAILURE: If you cannot complete this stage successfully, write a brief failure description to ${join(dir, 'done', 'planning.failed')} INSTEAD of the .done marker. Then stop.
 
 The original user description:
 ---

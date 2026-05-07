@@ -35,9 +35,36 @@ function createRunner({ dir, api, stages, onAdvance = () => {}, lockFor = null, 
   }
 
   function handleMarker(filename) {
-    if (!filename || !filename.endsWith('.done')) return;
+    if (!filename) return;
     // Ignore deletion events — only act when the file actually exists.
     if (!existsSync(join(dir, 'done', filename))) return;
+
+    if (filename.endsWith('.failed')) {
+      const stage = filename.slice(0, -'.failed'.length);
+      if (stage === 'smoketest') return; // smoketest uses fix loop-back
+      const failureFile = join(dir, 'done', filename);
+      let failureText = '';
+      try { failureText = require('node:fs').readFileSync(failureFile, 'utf8'); } catch {}
+      const cur = state.read(dir);
+      const prev = cur.stageFailures?.[stage] || [];
+      if (prev.length >= 1) {
+        const failed = state.update(dir, (c) => { c.currentStage = 'failed'; });
+        onAdvance(failed);
+        return;
+      }
+      state.update(dir, (c) => {
+        c.stageFailures = c.stageFailures || {};
+        c.stageFailures[stage] = [...(c.stageFailures[stage] || []), failureText];
+      });
+      try { unlinkSync(failureFile); } catch {}
+      if (currentSession) api.closeSession(currentSession);
+      currentSession = null;
+      if (currentLock) { currentLock.release(); currentLock = null; }
+      spawnCurrentStage();
+      return;
+    }
+
+    if (!filename.endsWith('.done')) return;
     const stageDone = filename.slice(0, -'.done'.length);
 
     // Smoketest is special — branch on result.

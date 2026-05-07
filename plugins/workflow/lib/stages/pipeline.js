@@ -1,10 +1,15 @@
 const { join } = require('node:path');
 
 function build(s, dir) {
+  const stageName = 'pipeline';
+  const retryContext = (s.stageFailures?.[stageName]?.length)
+    ? `\nPRIOR ATTEMPT FAILED — address these failures before continuing:\n${s.stageFailures[stageName].join('\n---\n')}\n`
+    : '';
   return `You are the pipeline orchestrator for CliDeck Workflow ${s.id}.
 
 CONTEXT FILE: ${join(dir, 'state.json')}
 Read it. You will use \`issues\`, \`branch\`, \`githubRepo\`.
+${retryContext}
 
 STEP 1 — Confirm issue order.
 Read \`issues\`. Verify topological order against \`dependencies\`. Re-order if needed and write back.
@@ -39,6 +44,8 @@ Regenerate summary.md (basic version: Description, Issues completed, Manual setu
 STEP 8 — Signal completion.
 Print: WORKFLOW_STAGE_DONE: pipeline
 Create marker: touch ${join(dir, 'done', 'pipeline.done')}
+
+ON FAILURE: If you cannot complete this stage successfully, write a brief failure description to ${join(dir, 'done', 'pipeline.failed')} INSTEAD of the .done marker. Then stop.
 `;
 }
 
