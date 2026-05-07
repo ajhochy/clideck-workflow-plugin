@@ -6,6 +6,7 @@ const { execFile: _execFile } = require('child_process');
 const npmExec = (args, opts, cb) => _execFile('npm', args, { ...opts, shell: process.platform === 'win32' }, cb);
 const { DATA_DIR } = require('./paths');
 const transcript = require('./transcript');
+const mcpClient = require('./mcp-client');
 
 const PLUGINS_DIR = join(DATA_DIR, 'plugins');
 mkdirSync(PLUGINS_DIR, { recursive: true });
@@ -312,6 +313,10 @@ function buildApi(pluginId, pluginDir, state) {
     },
     onShutdown(fn) { state.shutdownFns.push(fn); },
     log(msg) { console.log(`[plugin:${pluginId}] ${msg}`); },
+
+    callMcp(serverName, toolName, args) {
+      return mcpClient.callMcp(serverName, toolName, args);
+    },
   };
 }
 
