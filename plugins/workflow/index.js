@@ -3,6 +3,13 @@ const state = require('./lib/state');
 const wf = require('./lib/workflow-folder');
 const branch = require('./lib/branch');
 const { createLock } = require('./lib/smoketest-lock');
+const { createRunner } = require('./lib/runner');
+const stages = {
+  planning: require('./lib/stages/planning'),
+  issues: require('./lib/stages/issues'),
+  pipeline: require('./lib/stages/pipeline'),
+  smoketest: require('./lib/stages/smoketest'),
+};
 
 module.exports = {
   init(api) {
@@ -19,11 +26,11 @@ module.exports = {
     api._workflowCtx = ctx; // for tests
     api.log('Workflow plugin initialized');
 
-    api.onFrontendMessage('list', () => {
-      const ids = wf.listWorkflows(root);
-      const list = ids.map((id) => state.read(join(root, id)));
-      api.sendToFrontend('list', { workflows: list });
-    });
+    function listAll() {
+      return wf.listWorkflows(root).map((id) => state.read(join(root, id)));
+    }
+
+    api.onFrontendMessage('list', () => api.sendToFrontend('list', { workflows: listAll() }));
 
     api.onFrontendMessage('create', (msg) => {
       const { description, title, branch: branchInput, projectId } = msg;
@@ -53,9 +60,16 @@ module.exports = {
       state.write(dir, s);
       inFlight.add(finalBranch);
       ctx.inFlightBranches.set(projectId, inFlight);
-      ctx.workflows.set(id, { dir });
+      const runner = createRunner({
+        dir,
+        api,
+        stages,
+        onAdvance: () => api.sendToFrontend('list', { workflows: listAll() }),
+      });
+      ctx.workflows.set(id, { dir, runner });
       api.sendToFrontend('created', { id });
       api.log(`Created workflow ${id} on branch ${finalBranch}`);
+      runner.start();
     });
 
     api.onShutdown(() => api.log('Workflow plugin shutting down'));
