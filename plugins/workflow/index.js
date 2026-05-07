@@ -63,8 +63,22 @@ module.exports = {
       const set = ctx.inFlightBranches.get(s.projectId) || new Set();
       if (s.branch) set.add(s.branch);
       ctx.inFlightBranches.set(s.projectId, set);
+      const trackedApi = {
+        ...api,
+        createSession: (opts) => {
+          const sid = api.createSession(opts);
+          const entry = ctx.workflows.get(id);
+          if (entry) entry.activeSession = sid;
+          return sid;
+        },
+        closeSession: (sid) => {
+          const entry = ctx.workflows.get(id);
+          if (entry?.activeSession === sid) entry.activeSession = null;
+          return api.closeSession(sid);
+        },
+      };
       const runner = createRunner({
-        dir, api, stages,
+        dir, api: trackedApi, stages,
         onAdvance: (u) => {
           api.sendToFrontend('list', { workflows: listAll() });
           finalize(u, dir).catch((e) => api.log(`finalize error: ${e.message}`));
@@ -128,9 +142,23 @@ module.exports = {
       state.write(dir, s);
       inFlight.add(finalBranch);
       ctx.inFlightBranches.set(projectId, inFlight);
+      const trackedApi = {
+        ...api,
+        createSession: (opts) => {
+          const sid = api.createSession(opts);
+          const entry = ctx.workflows.get(id);
+          if (entry) entry.activeSession = sid;
+          return sid;
+        },
+        closeSession: (sid) => {
+          const entry = ctx.workflows.get(id);
+          if (entry?.activeSession === sid) entry.activeSession = null;
+          return api.closeSession(sid);
+        },
+      };
       const runner = createRunner({
         dir,
-        api,
+        api: trackedApi,
         stages,
         onAdvance: (s) => {
           api.sendToFrontend('list', { workflows: listAll() });
@@ -143,6 +171,16 @@ module.exports = {
       api.sendToFrontend('created', { id });
       api.log(`Created workflow ${id} on branch ${finalBranch}`);
       runner.start();
+    });
+
+    api.onFrontendMessage('chat', ({ id, text }) => {
+      const sess = ctx.workflows.get(id)?.activeSession;
+      if (sess) api.inputToSession(sess, text + '\r');
+    });
+
+    api.onFrontendMessage('openSession', ({ id }) => {
+      const sess = ctx.workflows.get(id)?.activeSession;
+      if (sess) api.sendToFrontend('focusSession', { sessionId: sess });
     });
 
     api.onShutdown(() => api.log('Workflow plugin shutting down'));

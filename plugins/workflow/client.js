@@ -10,6 +10,10 @@ let _api = null;
 let panelEl = null;
 let visible = false;
 let pendingResumables = null;
+let expandedId = null;
+
+const STAGE_ORDER = ['planning', 'issues', 'pipeline', 'smoketest'];
+const STAGE_LABELS = { planning: 'Planning', issues: 'Issues', pipeline: 'Pipeline', smoketest: 'Smoke test' };
 
 // ---------------------------------------------------------------------------
 // Panel DOM bootstrap
@@ -96,12 +100,24 @@ function render(list) {
 
   // Workflow rows
   for (const w of list) {
+    const isExpanded = w.id === expandedId;
     const row = document.createElement('div');
-    row.style.cssText = 'border:1px solid #374151;border-radius:6px;padding:8px;margin-bottom:6px;';
+    row.style.cssText = 'border:1px solid #374151;border-radius:6px;padding:8px;margin-bottom:6px;cursor:pointer;';
+    row.onclick = (e) => {
+      if (e.target.tagName === 'BUTTON' || e.target.tagName === 'TEXTAREA') return;
+      expandedId = isExpanded ? null : w.id;
+      _api.send('list');
+    };
+
     const titleDiv = document.createElement('div');
+    titleDiv.style.cssText = 'display:flex;justify-content:space-between;align-items:center;';
     const strong = document.createElement('strong');
     strong.textContent = w.title || w.id || '(untitled)';
     titleDiv.appendChild(strong);
+    const chevron = document.createElement('span');
+    chevron.textContent = isExpanded ? '▲' : '▼';
+    chevron.style.cssText = 'font-size:10px;opacity:0.6;';
+    titleDiv.appendChild(chevron);
     row.appendChild(titleDiv);
 
     const metaDiv = document.createElement('div');
@@ -113,6 +129,88 @@ function render(list) {
     stageDiv.style.cssText = 'font-size:12px;margin-top:4px;';
     stageDiv.textContent = `Stage: ${w.currentStage || 'unknown'}`;
     row.appendChild(stageDiv);
+
+    if (isExpanded) {
+      const detail = document.createElement('div');
+      detail.style.cssText = 'margin-top:8px;border-top:1px solid #374151;padding-top:8px;';
+
+      // Stage checklist
+      const stageList = document.createElement('div');
+      stageList.style.cssText = 'margin-bottom:8px;';
+      const currentIdx = STAGE_ORDER.indexOf(w.currentStage);
+      for (let i = 0; i < STAGE_ORDER.length; i++) {
+        const sName = STAGE_ORDER[i];
+        const sLine = document.createElement('div');
+        sLine.style.cssText = 'font-size:12px;margin-bottom:2px;';
+        const isPast = currentIdx > i || w.currentStage === 'done';
+        const isCurrent = currentIdx === i && w.currentStage !== 'done' && w.currentStage !== 'failed';
+        const dot = isPast ? '●' : '○';
+        const label = STAGE_LABELS[sName] || sName;
+        sLine.innerHTML = `<span style="opacity:${isPast ? '1' : '0.4'}">${dot}</span> `;
+        const labelSpan = document.createElement('span');
+        labelSpan.textContent = label;
+        if (isCurrent) labelSpan.style.fontWeight = 'bold';
+        sLine.appendChild(labelSpan);
+        stageList.appendChild(sLine);
+      }
+      detail.appendChild(stageList);
+
+      // Open session button
+      const openBtn = document.createElement('button');
+      openBtn.textContent = 'Open active session';
+      openBtn.style.cssText = 'background:#374151;border:none;color:#e5e7eb;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:12px;margin-bottom:6px;';
+      openBtn.onclick = (e) => { e.stopPropagation(); _api.send('openSession', { id: w.id }); };
+      detail.appendChild(openBtn);
+
+      // Planning chat box
+      if (w.currentStage === 'planning') {
+        const chatWrap = document.createElement('div');
+        chatWrap.style.cssText = 'margin-top:6px;';
+        const chatLabel = document.createElement('div');
+        chatLabel.style.cssText = 'font-size:11px;opacity:0.7;margin-bottom:4px;';
+        chatLabel.textContent = 'Send message to planning agent:';
+        chatWrap.appendChild(chatLabel);
+        const textarea = document.createElement('textarea');
+        textarea.style.cssText = 'width:100%;background:#111827;color:#e5e7eb;border:1px solid #374151;border-radius:4px;padding:5px;font-size:12px;box-sizing:border-box;resize:vertical;height:56px;font-family:inherit;';
+        textarea.placeholder = 'Type a message…';
+        textarea.onclick = (e) => e.stopPropagation();
+        chatWrap.appendChild(textarea);
+        const sendBtn = document.createElement('button');
+        sendBtn.textContent = 'Send';
+        sendBtn.style.cssText = 'background:#4f46e5;border:none;color:#fff;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:12px;margin-top:4px;';
+        sendBtn.onclick = (e) => {
+          e.stopPropagation();
+          const text = textarea.value.trim();
+          if (!text) return;
+          _api.send('chat', { id: w.id, text });
+          textarea.value = '';
+        };
+        chatWrap.appendChild(sendBtn);
+        detail.appendChild(chatWrap);
+      }
+
+      // Failure: error context + retry button
+      if (w.currentStage === 'failed') {
+        const failWrap = document.createElement('div');
+        failWrap.style.cssText = 'margin-top:6px;';
+        if (w.stageFailures && Object.keys(w.stageFailures).length) {
+          const errPre = document.createElement('pre');
+          errPre.style.cssText = 'font-size:11px;color:#f87171;background:#1f0a0a;padding:6px;border-radius:4px;overflow:auto;max-height:80px;white-space:pre-wrap;';
+          const failEntries = Object.entries(w.stageFailures);
+          const lastFail = failEntries[failEntries.length - 1];
+          errPre.textContent = `${lastFail[0]}: ${JSON.stringify(lastFail[1]).slice(0, 200)}`;
+          failWrap.appendChild(errPre);
+        }
+        const retryBtn = document.createElement('button');
+        retryBtn.textContent = 'Retry (open session)';
+        retryBtn.style.cssText = 'background:#7f1d1d;border:none;color:#fca5a5;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:12px;margin-top:4px;';
+        retryBtn.onclick = (e) => { e.stopPropagation(); _api.send('openSession', { id: w.id }); };
+        failWrap.appendChild(retryBtn);
+        detail.appendChild(failWrap);
+      }
+
+      row.appendChild(detail);
+    }
 
     p.appendChild(row);
   }
@@ -260,6 +358,11 @@ export function init(api) {
     // After the next render, insert the banner. Simplest: maintain a pendingResumables variable and have render() pick it up.
     pendingResumables = workflows;
     _api.send('list'); // trigger a re-render
+  });
+
+  // Focus a session when the backend asks
+  api.onMessage('focusSession', ({ sessionId }) => {
+    if (sessionId && typeof api.focusSession === 'function') api.focusSession(sessionId);
   });
 
   // Warning from backend (e.g. branch conflict, validation)
