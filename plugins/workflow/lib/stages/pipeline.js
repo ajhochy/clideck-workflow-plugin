@@ -14,7 +14,6 @@ function build(s, dir) {
   const retryContext = (s.stageFailures?.[stageName]?.length)
     ? `\nPRIOR ATTEMPT FAILED — address these failures before continuing:\n${s.stageFailures[stageName].join('\n---\n')}\n`
     : '';
-
   const next = pickNextIssue(s.issues);
   if (next) return buildStepPrompt({ s, dir, issue: next, retryContext, pluginRoot });
   return buildFinalizePrompt({ s, dir, retryContext, summaryJsPath });
