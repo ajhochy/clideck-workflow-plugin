@@ -5,7 +5,7 @@ function build(s, dir) {
   const retryContext = (s.stageFailures?.[stageName]?.length)
     ? `\nPRIOR ATTEMPT FAILED — address these failures before continuing:\n${s.stageFailures[stageName].join('\n---\n')}\n`
     : '';
-  return `You are the issue-creation agent for CliDeck Workflow ${s.id}.
+  return `You are the issue-creation agent for CliDeck Workflow ${s.title}.
 
 CONTEXT FILE: ${join(dir, 'state.json')}
 Read it. You will use the \`plan\` field — its structured atomic steps are your source.
@@ -16,7 +16,7 @@ Run: \`gh repo view --json nameWithOwner\` (or \`git remote get-url origin\`). I
 
 STEP 2 — Create issues (or local TODOs).
 GitHub mode:
-- Create one milestone for this workflow titled "${s.title || 'Workflow'} (${s.id})".
+- Create one milestone for this workflow titled "${s.title || 'Workflow'}".
 - For each atomic step in plan.steps, create a GitHub issue under that milestone. Title = step title. Body = step body verbatim, including file paths, function names, expected behavior, dependencies, coherence-rule references.
 - Use \`gh issue create --milestone …\`. Capture the issue numbers.
 
