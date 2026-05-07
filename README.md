@@ -49,14 +49,14 @@ npm install -g clideck
 clideck
 ```
 
-Open [localhost:4000](http://localhost:4000). Click **+**, pick an agent, start working.
+Open [localhost:4002](http://localhost:4002). Click **+**, pick an agent, start working.
 
 Or just run it once with `npx clideck`. Works on macOS and Windows. Node 18+. Linux: untested - if you try it, [open an issue](https://github.com/rustykuntz/clideck/issues).
 
-If port `4000` is already in use:
+If port `4002` is already in use:
 
 ```bash
-clideck --port 4001
+clideck --port 4003
 ```
 
 ## What makes it useful
