@@ -23,7 +23,7 @@ function filterClientCommands(commands) {
 }
 const transcript = require('./transcript');
 const plugins = require('./plugin-loader');
-const { upsertCodexConfig, validateCodexConfigToml } = require('./codex-config');
+const { upsertCodexConfig, validateCodexConfigToml, codexNotifyHelperConfigured } = require('./codex-config');
 const { installCodexHooks, removeCodexHooks, codexHooksHealthy } = require('./codex-hooks');
 
 const opencodePluginDir = join(
@@ -617,7 +617,9 @@ function applyTelemetryConfig(preset) {
       if (existsSync(configPath)) content = readFileSync(configPath, 'utf8');
       const hasOtel = content.includes('[otel]');
       const hasCurrentOtel = content.includes(`localhost:${port}`);
-      const hasNotify = /^\s*notify\s*=.*notify-helper/m.test(content);
+      // Recognize both the unwrapped form and Computer-Use's wrapped form ("--previous-notify").
+      // Otherwise wrap-aware tools nuke our notify directive on every reconfigure.
+      const hasNotify = codexNotifyHelperConfigured(content);
       const hasWrongOtel = content.includes(`endpoint = "http://localhost:${port}/v1/logs"`);
       const codexHookPath = join(__dirname, 'bin', 'codex-hook.js').replace(/\\/g, '/');
       const hasHooks = codexHooksFeatureEnabled(content) && codexHooksHealthy(home, codexHookPath, port);

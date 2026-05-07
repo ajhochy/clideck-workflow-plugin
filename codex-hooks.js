@@ -73,15 +73,18 @@ function removeCodexHooks(home) {
   }
 }
 
-function codexHooksHealthy(home, helperPath, port) {
+// Path-tolerant: don't require the on-disk command to embed the CURRENT
+// helperPath string — only that it points at codex-hook.js for this port + route.
+// Otherwise every worktree (or a moved/renamed install) triggers a needless rewrite,
+// and competing worktrees thrash the file on each launch.
+function codexHooksHealthy(home, _helperPath, port) {
   try {
     const doc = readHooksFile(join(home, '.codex', 'hooks.json'));
     for (const [event, route] of Object.entries(EVENTS)) {
       const groups = Array.isArray(doc.hooks?.[event]) ? doc.hooks[event] : [];
-      const expected = commandFor(process.execPath.replace(/\\/g, '/'), helperPath, port, route);
       const found = groups.some(group => (group.hooks || []).some(hook => {
         if (!isClideckHook(hook)) return false;
-        return hook.command === expected || (hook.command.includes(helperPath) && hook.command.includes(` ${port} ${route}`));
+        return hook.command.includes(' ' + port + ' ' + route);
       }));
       if (!found) return false;
     }
