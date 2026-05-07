@@ -13,7 +13,7 @@ function parsePort(value) {
 const PORT = parsePort(argValue('--port'))
   || parsePort(process.env.CLIDECK_PORT)
   || parsePort(process.env.PORT)
-  || 4000;
+  || 4002;
 
 const HOST = (() => {
   const idx = process.argv.indexOf('--host');
