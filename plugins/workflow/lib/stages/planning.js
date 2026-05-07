@@ -1,6 +1,10 @@
 const { join } = require('node:path');
+const fixmod = require('../fix-subworkflow');
 
 function build(s, dir) {
+  if (s.fixAttempts && s.fixAttempts.length > 0) {
+    return fixmod.buildFixPrompt(s, dir);
+  }
   return `You are the planning lead for CliDeck Workflow ${s.id}.
 
 Your job has 6 phases — execute them in order. Do NOT skip phases.

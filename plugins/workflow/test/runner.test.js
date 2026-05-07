@@ -98,3 +98,69 @@ test('runner waits for lockFor when entering a locked stage and releases on adva
     assert.equal(releaseCount, 1, 'lock released when smoketest completes');
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('runner triggers fix sub-workflow on smoketest failure when retries available', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'wflb-'));
+  try {
+    const id = 'wf-loop';
+    const dir = initFolder(root, id);
+    const s = state.createState({ id, title: 't', description: 'd', projectId: 'p', branch: 'feat/x' });
+    s.currentStage = 'smoketest';
+    s.smoketestResult = { status: 'failed', failures: [{ item: 'x', actual: 'y' }] };
+    state.write(dir, s);
+    // pre-create existing markers as if the previous stages completed
+    writeFileSync(join(dir, 'done', 'planning.done'), '');
+    writeFileSync(join(dir, 'done', 'issues.done'), '');
+    writeFileSync(join(dir, 'done', 'pipeline.done'), '');
+
+    const advances = [];
+    const fakeApi = {
+      createSession: () => 'sess', closeSession: () => {}, log: () => {},
+    };
+    const runner = createRunner({
+      dir, api: fakeApi,
+      stages: { planning: { build: () => 'P' }, smoketest: { build: () => 'S' } },
+      onAdvance: (u) => advances.push(u.currentStage),
+      maxFixAttempts: 2,
+    });
+    runner.start();
+    await tick(50);
+    writeFileSync(join(dir, 'done', 'smoketest.done'), '');
+    await tick(150);
+    runner.stop();
+
+    const final = state.read(dir);
+    assert.equal(final.fixAttempts.length, 1, 'one fix attempt recorded');
+    assert.equal(final.currentStage, 'planning', 'stage rolled back to planning');
+    assert.equal(final.smoketestResult, null, 'smoketestResult cleared');
+    // existing markers should have been removed
+    assert.ok(!require('node:fs').existsSync(join(dir, 'done', 'pipeline.done')));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('runner marks failed when max fix attempts exceeded', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'wfmx-'));
+  try {
+    const id = 'wf-max';
+    const dir = initFolder(root, id);
+    const s = state.createState({ id, title: 't', description: 'd', projectId: 'p', branch: 'feat/x' });
+    s.currentStage = 'smoketest';
+    s.smoketestResult = { status: 'failed', failures: [{ item: 'x' }] };
+    s.fixAttempts = [{}, {}];
+    state.write(dir, s);
+
+    const fakeApi = { createSession: () => 'sess', closeSession: () => {}, log: () => {} };
+    const runner = createRunner({
+      dir, api: fakeApi,
+      stages: { smoketest: { build: () => 'S' } },
+      onAdvance: () => {},
+      maxFixAttempts: 2,
+    });
+    runner.start();
+    await tick(50);
+    writeFileSync(join(dir, 'done', 'smoketest.done'), '');
+    await tick(150);
+    runner.stop();
+    assert.equal(state.read(dir).currentStage, 'failed');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

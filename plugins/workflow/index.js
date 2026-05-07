@@ -107,6 +107,7 @@ module.exports = {
           finalize(s, dir).catch((e) => api.log(`finalize error: ${e.message}`));
         },
         lockFor: (stageName, wfId) => stageName === 'smoketest' ? ctx.smoketestLock.acquire(wfId) : null,
+        maxFixAttempts: api.getSetting('maxFixAttempts') ?? 2,
       });
       ctx.workflows.set(id, { dir, runner });
       api.sendToFrontend('created', { id });
