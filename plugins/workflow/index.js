@@ -71,6 +71,18 @@ module.exports = {
       }
     }
 
+    function performDeleteRm(dir) {
+      let lastErr = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 2, retryDelay: 50 }); }
+        catch (e) { lastErr = e; }
+        if (!fs.existsSync(dir)) return null;
+        const until = Date.now() + 100;
+        while (Date.now() < until) { /* spin */ }
+      }
+      return lastErr || new Error('directory still exists after retries');
+    }
+
     // Relay output from each workflow's active stage session to the panel so
     // questions/decisions surface in the panel chat box, not only in the
     // terminal. Strip ANSI to keep the panel readable.
