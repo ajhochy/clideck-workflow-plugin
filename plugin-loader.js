@@ -220,9 +220,16 @@ function buildApi(pluginId, pluginDir, state) {
 
     createSession(opts) {
       const cfg = getConfigFn?.();
-      if (!cfg || !createSessionFn) return null;
+      if (!cfg || !createSessionFn) {
+        console.error(`[plugin:${pluginId}] createSession: no cfg or createSessionFn`);
+        return null;
+      }
       const result = createSessionFn(opts, cfg);
-      return result.error ? null : result.id;
+      if (result.error) {
+        console.error(`[plugin:${pluginId}] createSession failed: ${result.error} opts=${JSON.stringify(opts)}`);
+        return null;
+      }
+      return result.id;
     },
     closeSession(id) {
       const cfg = getConfigFn?.();
