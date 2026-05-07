@@ -1,6 +1,6 @@
 // Roles panel — manage worker role definitions (core feature, not plugin-specific)
 import { state, send } from './state.js';
-import { esc } from './utils.js';
+import { esc, randomId } from './utils.js';
 
 const panel = document.getElementById('panel-roles');
 
@@ -99,7 +99,7 @@ function openEditor(idx) {
     if (idx != null) {
       state.cfg.roles[idx] = { ...state.cfg.roles[idx], name, instructions };
     } else {
-      state.cfg.roles.push({ id: crypto.randomUUID(), name, instructions });
+      state.cfg.roles.push({ id: randomId(), name, instructions });
     }
     save();
     closeEditor();

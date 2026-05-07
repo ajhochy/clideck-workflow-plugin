@@ -1,5 +1,5 @@
 import { state, send } from './state.js';
-import { esc, agentIcon, binName } from './utils.js';
+import { esc, agentIcon, binName, randomId } from './utils.js';
 import { openFolderPicker } from './folder-picker.js';
 import { estimateSize } from './terminals.js';
 import { showToast } from './toast.js';
@@ -113,7 +113,7 @@ function ensureCommandForPreset(preset) {
   let cmd = findCommandForPreset(preset);
   if (cmd) return cmd;
   cmd = {
-    id: crypto.randomUUID(),
+    id: randomId(),
     presetId: preset.presetId,
     label: preset.name,
     icon: preset.icon,
@@ -148,7 +148,7 @@ function ensureShellCommand() {
   }
   if (!command) return null;
   cmd = {
-    id: crypto.randomUUID(),
+    id: randomId(),
     presetId: 'shell',
     label: 'Shell',
     icon: shellPreset?.icon || 'terminal',
@@ -387,7 +387,7 @@ function showInstallToast(preset) {
       showToast('Could not find a shell command to run the installer.', { type: 'error', title: 'Install Failed' });
       return;
     }
-    const installId = crypto.randomUUID();
+    const installId = randomId();
     send({ type: 'create', commandId: shellCmd.id, name: `Installing ${preset.name}`, installId, ...estimateSize() });
     const handler = (e) => {
       const msg = JSON.parse(e.data);
