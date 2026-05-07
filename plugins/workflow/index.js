@@ -4,6 +4,7 @@ const wf = require('./lib/workflow-folder');
 const branch = require('./lib/branch');
 const { createLock } = require('./lib/smoketest-lock');
 const { createRunner } = require('./lib/runner');
+const rhythm = require('./lib/rhythm');
 const stages = {
   planning: require('./lib/stages/planning'),
   issues: require('./lib/stages/issues'),
@@ -25,6 +26,12 @@ module.exports = {
     };
     api._workflowCtx = ctx; // for tests
     api.log('Workflow plugin initialized');
+
+    ctx.rhythmAvailable = false;
+    rhythm.probe(api).then((ok) => {
+      ctx.rhythmAvailable = ok;
+      if (!ok) api.sendToFrontend('banner', { kind: 'warn', message: 'Rhythm MCP unavailable — manual setup will not auto-create tasks.' });
+    });
 
     function listAll() {
       return wf.listWorkflows(root).map((id) => state.read(join(root, id)));
