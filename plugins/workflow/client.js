@@ -134,10 +134,27 @@ function render(list) {
     };
 
     const titleDiv = document.createElement('div');
-    titleDiv.style.cssText = 'display:flex;justify-content:space-between;align-items:center;';
+    titleDiv.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:6px;';
     const strong = document.createElement('strong');
     strong.textContent = w.title || w.id || '(untitled)';
+    strong.style.cssText = 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
     titleDiv.appendChild(strong);
+
+    const delBtn = document.createElement('button');
+    delBtn.textContent = '✕';
+    delBtn.title = 'Delete workflow';
+    delBtn.style.cssText = 'background:transparent;border:none;color:#f87171;cursor:pointer;font-size:14px;padding:0 6px;line-height:1;opacity:0.6;';
+    delBtn.onmouseenter = () => { delBtn.style.opacity = '1'; };
+    delBtn.onmouseleave = () => { delBtn.style.opacity = '0.6'; };
+    delBtn.onclick = (e) => {
+      e.stopPropagation();
+      const label = w.title || w.id;
+      if (window.confirm(`Delete workflow "${label}"? This stops the active session and removes the workflow folder.`)) {
+        _api.send('delete', { id: w.id });
+      }
+    };
+    titleDiv.appendChild(delBtn);
+
     const chevron = document.createElement('span');
     chevron.textContent = isExpanded ? '▲' : '▼';
     chevron.style.cssText = 'font-size:10px;opacity:0.6;';
