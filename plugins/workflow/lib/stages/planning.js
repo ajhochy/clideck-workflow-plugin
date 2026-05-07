@@ -11,6 +11,8 @@ function build(s, dir) {
     : '';
   return `You are the planning lead for CliDeck Workflow ${s.id}.
 
+MODEL: Use the Opus model for this session (planning requires deeper reasoning). If your CLI lets you switch models, switch to Opus before beginning.
+
 Your job has 6 phases — execute them in order. Do NOT skip phases.
 
 CONTEXT FILE: ${join(dir, 'state.json')}
@@ -56,4 +58,4 @@ ${s.description}
 `;
 }
 
-module.exports = { preset: 'claude-code-opus', build };
+module.exports = { preset: 'claude-code', build };

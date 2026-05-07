@@ -15,6 +15,8 @@ test('planning prompt includes state path, description, and instructs codebase e
   assert.match(out, /done\/planning\.done/);
 });
 
-test('planning preset is opus claude-code', () => {
-  assert.match(planning.preset, /opus/i);
+test('planning uses claude-code preset and instructs Opus model in prompt body', () => {
+  assert.equal(planning.preset, 'claude-code');
+  const out = planning.build({ id: 'wf-1', description: 'x' }, '/tmp/wf-1');
+  assert.match(out, /opus/i);
 });
