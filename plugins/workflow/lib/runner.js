@@ -5,7 +5,7 @@ const fixmod = require('./fix-subworkflow');
 const { createLogger } = require('./logger');
 const { pollPrChecks } = require('./ci-poller');
 
-const SEQUENCE = ['planning', 'issues', 'pipeline', 'smoketest'];
+const SEQUENCE = ['planning', 'issues', 'pipeline', 'manual-setup', 'smoketest'];
 const MAX_CI_RETRIES_PER_ISSUE = 3;
 
 function nextStage(current) {
@@ -27,6 +27,29 @@ function createRunner({ dir, api, stages, onAdvance = () => {}, lockFor = null, 
     if (s.currentStage === 'done' || s.currentStage === 'failed') return;
     const stage = stages[s.currentStage];
     if (!stage) return;
+
+    // Short-circuit: if manual-setup has no items to walk through, skip the stage
+    // entirely so we don't spin up a Gemini session for nothing.
+    if (s.currentStage === 'manual-setup' && !(Array.isArray(s.manualSetup) && s.manualSetup.length)) {
+      try { wfLog.event('stage_skipped_empty', { stage: 'manual-setup' }); } catch {}
+      require('node:fs').writeFileSync(join(dir, 'done', 'manual-setup.done'), '');
+      return;
+    }
+
+    // Merge stashed confirmedAt timestamps from a prior fix-loop pass back
+    // into the freshly-rewritten manualSetup so the user isn't re-walked
+    // through tasks they already finished.
+    if (s.currentStage === 'manual-setup' && s._priorConfirmed && Array.isArray(s.manualSetup)) {
+      state.update(dir, (cur) => {
+        const priors = cur._priorConfirmed || {};
+        for (const item of cur.manualSetup) {
+          if (item && item.title && priors[item.title] && !item.confirmedAt) {
+            item.confirmedAt = priors[item.title];
+          }
+        }
+        delete cur._priorConfirmed;
+      });
+    }
 
     try { wfLog.event('stage_spawn_attempt', { stage: s.currentStage, fixAttempts: s.fixAttempts?.length || 0 }); } catch {}
 
@@ -207,7 +230,7 @@ function createRunner({ dir, api, stages, onAdvance = () => {}, lockFor = null, 
         if (willRetry) {
           try { sessionStreams.get(sid)?.close({ stage: stageDone }); sessionStreams.delete(sid); } catch {}
           // Clear all markers
-          for (const m of ['planning', 'issues', 'pipeline', 'smoketest']) {
+          for (const m of ['planning', 'issues', 'pipeline', 'manual-setup', 'smoketest']) {
             try { unlinkSync(join(dir, 'done', `${m}.done`)); } catch {}
           }
           fixmod.startFixAttempt(dir, state);

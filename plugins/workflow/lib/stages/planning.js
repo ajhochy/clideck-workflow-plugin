@@ -11,58 +11,29 @@ function build(s, dir) {
     ? `\nPRIOR ATTEMPT FAILED — address these failures before continuing:\n${s.stageFailures[stageName].join('\n---\n')}\n`
     : '';
   const pluginRoot = path.resolve(__dirname, '..', '..');
-  return `You are the planning lead for CliDeck Workflow ${s.title || s.id}.
-(Workflow folder: ${dir})
-
-MODEL: Use the Opus model for this session (planning requires deeper reasoning). If your CLI lets you switch models, switch to Opus before beginning.
-
-Your job has 7 phases — execute them in order. Do NOT skip phases.
-
-CONTEXT FILE: ${join(dir, 'state.json')}
-Read it first. The user's description is the \`description\` field. Project root is whatever directory the session is running in.
+  return `Planning lead for CliDeck Workflow ${s.title || s.id} (folder: ${dir}).
+MODEL: switch to Opus before beginning — planning needs deeper reasoning.
+CONTEXT FILE: ${join(dir, 'state.json')} — read it first; user description is in \`description\`.
 ${retryContext}
-PROGRESS REPORTING
-Throughout this stage, after starting each phase below, run: \`node ${pluginRoot}/bin/report-progress.js ${dir} planning <currentPhaseNumber> 7 "<short label>"\`. Phases and their labels are: 1=explore, 2=clarify, 3=design, 4=write-plan, 5=write-state, 6=smoketest-md, 7=signal-completion. Do NOT skip a bump — this drives the UI progress bar.
+Execute these 7 phases in order; do not skip. After starting each phase, bump progress:
+\`node ${pluginRoot}/bin/report-progress.js ${dir} planning <phase> 7 "<label>"\`
+Labels: 1=explore, 2=clarify, 3=design, 4=write-plan, 5=write-state, 6=smoketest-md, 7=signal-completion.
 
-PHASE 1 — Explore the codebase.
-Dispatch Haiku subagents (use the Explore subagent or feature-dev:code-explorer skill) to thoroughly map:
-- Architecture, conventions, file structure
-- The specific files/modules relevant to "${s.description.slice(0, 200)}"
-- Existing patterns the work must conform to
-Wait for all subagents to return before continuing.
+PHASE 1 — Explore the codebase. Dispatch Haiku subagents (Explore or feature-dev:code-explorer) to map architecture/conventions, files relevant to "${s.description.slice(0, 200)}", and patterns the work must follow. Wait for all to return.
 
-PHASE 2 — Ask the user clarifying questions.
-Now that you understand the codebase, ask clarifying questions about scope and desired outcome. Ask one or two at a time. Continue until you are confident you understand what success looks like. The user may answer in this terminal or via the workflow panel; both pipe in here.
+PHASE 2 — Ask clarifying questions one or two at a time until you understand success. User answers via terminal or workflow panel.
 
-PHASE 3 — Design the architecture.
-Without further user feedback, design the architecture that aligns most closely with the existing codebase. Do not ask the user about architecture choices.
+PHASE 3 — Design the architecture that aligns with the existing codebase. Do not ask the user about architecture.
 
-PHASE 4 — Write the plan.
-Produce a detailed plan as atomic steps. Each step MUST contain:
-- File paths to create or modify (with line ranges where relevant)
-- Function/symbol names involved
-- Expected behavior
-- Dependencies on prior steps
-- Coherence rules across steps (so multiple agents stay consistent)
-Each step must be self-contained: an implementing agent should NOT need to re-read the codebase to execute it.
+PHASE 4 — Write the plan as atomic steps. Each step MUST contain: file paths (with line ranges where relevant), function/symbol names, expected behavior, dependencies, coherence rules. Each atomic step must be self-contained — no re-reading the codebase to execute it.
 
-PHASE 5 — Write back to state.json.
-Append your plan to \`state.json.plan\` (a structured object: { steps: [...], coherenceRules: [...] }). Use a node script or jq, do not hand-edit blindly.
+PHASE 5 — Write \`state.json.plan = { steps: [...], coherenceRules: [...] }\` via node script or jq, not hand-edit.
 
-PHASE 6 — Author smoketest.md.
-Based on the plan you just produced (state.json.plan.steps), write a complete Markdown smoketest checklist to ${join(dir, 'smoketest.md')}. Each checklist item must include: (a) precise actions to perform, (b) the exact expected result to verify, (c) where to verify (URL, native app, log file, command output), (d) any cross-app side effect to confirm (emails, external integrations). Cover every plan step plus any cross-cutting verifications implied by coherenceRules. Do NOT execute the checklist — only write the file. Do NOT git-add or commit. Overwriting is allowed only if smoketest.md does not already exist; if it exists with non-empty content, append a section ## Re-plan additions instead of overwriting.
+PHASE 6 — Author smoketest.md at ${join(dir, 'smoketest.md')}. Each item: (a) precise actions, (b) expected result, (c) where to verify (URL, native app, log, command), (d) any cross-app side effect. Cover every plan step + coherenceRules. Do NOT execute the checklist or git-add/commit. If the file already exists with content, append a \`## Re-plan additions\` section instead of overwriting.
 
-PHASE 7 — Signal completion.
-Print this line to the terminal: WORKFLOW_STAGE_DONE: planning
-Then create the marker file: \`touch ${join(dir, 'done', 'planning.done')}\`
-Stop.
+PHASE 7 — Print \`WORKFLOW_STAGE_DONE: planning\`, then \`touch ${join(dir, 'done', 'planning.done')}\` and stop.
 
-ON FAILURE: If you cannot complete this stage successfully, write a brief failure description to ${join(dir, 'done', 'planning.failed')} INSTEAD of the .done marker. Then stop.
-
-The original user description:
----
-${s.description}
----
+ON FAILURE: write a brief failure description to ${join(dir, 'done', 'planning.failed')} instead of the .done marker, then stop.
 `;
 }
 

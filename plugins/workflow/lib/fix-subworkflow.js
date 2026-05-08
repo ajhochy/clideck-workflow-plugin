@@ -24,6 +24,13 @@ function startFixAttempt(dir, state) {
     cur.smoketestResult = null;
     cur.plan = null; // will be rewritten by abbreviated stage 1
     cur.issues = [];
+    // Stash confirmed manual-setup timestamps so we don't re-walk the user
+    // through tasks they already did. Pipeline finalizer overwrites manualSetup
+    // on each pass; the runner merges these back in when manual-setup respawns.
+    const priors = (cur.manualSetup || [])
+      .filter((x) => x && x.title && x.confirmedAt)
+      .map((x) => [x.title, x.confirmedAt]);
+    if (priors.length) cur._priorConfirmed = Object.fromEntries(priors);
     // markers cleared by caller
   });
 }
