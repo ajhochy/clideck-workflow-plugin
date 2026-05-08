@@ -21,23 +21,12 @@ test('planning uses claude-code preset and instructs Opus model in prompt body',
   assert.match(out, /opus/i);
 });
 
-test('planning prompt includes smoketest.md authoring phase before signal completion', () => {
-  const { join } = require('node:path');
+test('planning prompt delegates smoketest.md authoring to the smoketest stage', () => {
   const dir = '/tmp/wf-smoketest';
   const s = { id: 'wf-smoketest', description: 'Test smoketest phase' };
   const out = planning.build(s, dir);
-  // smoketest.md is mentioned in the prompt
-  assert.match(out, /smoketest\.md/);
-  // The phase header is present
-  assert.match(out, /Author smoketest\.md/);
-  // Instructions mention expected result
-  assert.match(out, /expected result/);
-  // The absolute path to the smoketest file is present
-  assert.ok(out.includes(join(dir, 'smoketest.md')), `prompt should contain absolute path ${join(dir, 'smoketest.md')}`);
-  // Marker creation (WORKFLOW_STAGE_DONE) appears AFTER the smoketest authoring section
-  const smoketestIdx = out.indexOf('Author smoketest.md');
-  const doneIdx = out.indexOf('WORKFLOW_STAGE_DONE');
-  assert.ok(smoketestIdx !== -1, 'Author smoketest.md should be present');
-  assert.ok(doneIdx !== -1, 'WORKFLOW_STAGE_DONE should be present');
-  assert.ok(doneIdx > smoketestIdx, 'WORKFLOW_STAGE_DONE must appear after the smoketest authoring section');
+  assert.doesNotMatch(out, /Author smoketest\.md/);
+  assert.doesNotMatch(out, /smoketest\.md/);
+  assert.match(out, /<phase> 6/);
+  assert.match(out, /6=signal-completion/);
 });

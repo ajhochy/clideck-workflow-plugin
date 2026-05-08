@@ -15,9 +15,9 @@ function build(s, dir) {
 MODEL: switch to Opus before beginning — planning needs deeper reasoning.
 CONTEXT FILE: ${join(dir, 'state.json')} — read it first; user description is in \`description\`.
 ${retryContext}
-Execute these 7 phases in order; do not skip. After starting each phase, bump progress:
-\`node ${pluginRoot}/bin/report-progress.js ${dir} planning <phase> 7 "<label>"\`
-Labels: 1=explore, 2=clarify, 3=design, 4=write-plan, 5=write-state, 6=smoketest-md, 7=signal-completion.
+Execute these 6 phases in order; do not skip. After starting each phase, bump progress:
+\`node ${pluginRoot}/bin/report-progress.js ${dir} planning <phase> 6 "<label>"\`
+Labels: 1=explore, 2=clarify, 3=design, 4=write-plan, 5=write-state, 6=signal-completion.
 
 PHASE 1 — Explore the codebase. Dispatch Haiku subagents (Explore or feature-dev:code-explorer) to map architecture/conventions, files relevant to "${s.description.slice(0, 200)}", and patterns the work must follow. Wait for all to return.
 
@@ -29,9 +29,7 @@ PHASE 4 — Write the plan as atomic steps. Each step MUST contain: file paths (
 
 PHASE 5 — Write \`state.json.plan = { steps: [...], coherenceRules: [...] }\` via node script or jq, not hand-edit.
 
-PHASE 6 — Author smoketest.md at ${join(dir, 'smoketest.md')}. Each item: (a) precise actions, (b) expected result, (c) where to verify (URL, native app, log, command), (d) any cross-app side effect. Cover every plan step + coherenceRules. Do NOT execute the checklist or git-add/commit. If the file already exists with content, append a \`## Re-plan additions\` section instead of overwriting.
-
-PHASE 7 — Print \`WORKFLOW_STAGE_DONE: planning\`, then \`touch ${join(dir, 'done', 'planning.done')}\` and stop.
+PHASE 6 — Print \`WORKFLOW_STAGE_DONE: planning\`, then \`touch ${join(dir, 'done', 'planning.done')}\` and stop.
 
 ON FAILURE: write a brief failure description to ${join(dir, 'done', 'planning.failed')} instead of the .done marker, then stop.
 `;
