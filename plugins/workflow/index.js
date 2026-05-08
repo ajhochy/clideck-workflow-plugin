@@ -13,6 +13,7 @@ const summaryMod = require('./lib/summary');
 const { createPrModule } = require('./lib/pr');
 const resume = require('./lib/resume');
 const { createLogger } = require('./lib/logger');
+const { installBundledSkills } = require('./lib/install-skills');
 
 function runGh(args, cwd) {
   return new Promise((resolve, reject) => {
@@ -44,6 +45,7 @@ module.exports = {
       inFlightBranches: new Map(), // projectId → Set<branch>
     };
     api._workflowCtx = ctx; // for tests
+    try { installBundledSkills(api.pluginDir, (m) => api.log(m)); } catch (e) { api.log(`skill install failed: ${e.message}`); }
     api.log('Workflow plugin initialized');
 
     // Per-workflow-per-session log streams for file capture.

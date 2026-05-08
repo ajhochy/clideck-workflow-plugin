@@ -1,7 +1,7 @@
 {
   "id": "workflow",
   "name": "Workflow",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "author": "CliDeck",
   "description": "Turn a plain-language description into a smoketested PR via planning, issue creation, sequential implementation, and Codex smoketesting.",
   "install": "npm",

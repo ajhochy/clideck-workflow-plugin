@@ -13,14 +13,25 @@ const { readFileSync } = require('node:fs');
 const { homedir } = require('node:os');
 const { join } = require('node:path');
 
+function readJson(path) {
+  try { return JSON.parse(readFileSync(path, 'utf8')); } catch { return null; }
+}
+
 function loadServers() {
-  try {
-    const raw = readFileSync(join(homedir(), '.claude.json'), 'utf8');
-    const cfg = JSON.parse(raw);
-    return cfg.mcpServers || {};
-  } catch {
-    return {};
+  const home = homedir();
+  const merged = {};
+  // ~/.claude.json — top-level mcpServers, plus any per-project mcpServers blocks.
+  const root = readJson(join(home, '.claude.json'));
+  if (root) {
+    Object.assign(merged, root.mcpServers || {});
+    for (const proj of Object.values(root.projects || {})) {
+      if (proj && proj.mcpServers) Object.assign(merged, proj.mcpServers);
+    }
   }
+  // ~/.claude/settings.json — wins on conflict (Claude Code's canonical location).
+  const settings = readJson(join(home, '.claude', 'settings.json'));
+  if (settings && settings.mcpServers) Object.assign(merged, settings.mcpServers);
+  return merged;
 }
 
 function methodAndParams(toolName, args) {
