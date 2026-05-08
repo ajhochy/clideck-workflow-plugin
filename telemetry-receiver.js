@@ -12,8 +12,89 @@ const codexOutputDone = new Map(); // sessionId → ts (fallback if notify never
 const codexPendingIdle = new Map(); // sessionId → timer (tiny settle before committing idle)
 const codexToolPhasePending = new Set(); // sessionId set once Codex has announced a tool-call phase, cleared when the phase resolves
 const codexPendingTools = new Map(); // sessionId → Set(callId) for approved Codex tool calls still awaiting a result
+// sessionId → { totals: {input, output, cache_read, cache_creation}, byCallId: Map<callId, {...}> }
+const tokenStats = new Map();
 let broadcastFn = null;
 let sessionsFn = null;
+
+const TOKEN_KEYS = {
+  input: ['gen_ai.usage.input_tokens', 'llm.usage.input_tokens', 'input_tokens', 'gen_ai.usage.prompt_tokens'],
+  output: ['gen_ai.usage.output_tokens', 'llm.usage.output_tokens', 'output_tokens', 'gen_ai.usage.completion_tokens'],
+  cache_read: ['gen_ai.usage.cache_read_input_tokens', 'llm.usage.cache_read_input_tokens', 'cache_read_input_tokens'],
+  cache_creation: ['gen_ai.usage.cache_creation_input_tokens', 'llm.usage.cache_creation_input_tokens', 'cache_creation_input_tokens'],
+};
+const CALL_ID_KEYS = ['call_id', 'call.id', 'tool_call_id', 'gen_ai.request.id', 'request.id'];
+
+function pickFirstNumber(attrs, keys) {
+  for (const k of keys) {
+    const v = attrs[k];
+    if (typeof v === 'number') return v;
+    if (typeof v === 'string' && v !== '' && Number.isFinite(Number(v))) return Number(v);
+  }
+  return 0;
+}
+
+function pickFirstString(attrs, keys) {
+  for (const k of keys) {
+    const v = attrs[k];
+    if (typeof v === 'string' && v) return v;
+    if (typeof v === 'number') return String(v);
+  }
+  return null;
+}
+
+function ensureTokenBucket(sessionId) {
+  let bucket = tokenStats.get(sessionId);
+  if (!bucket) {
+    bucket = {
+      totals: { input: 0, output: 0, cache_read: 0, cache_creation: 0 },
+      byCallId: new Map(),
+    };
+    tokenStats.set(sessionId, bucket);
+  }
+  return bucket;
+}
+
+// Pulls token counts out of an OTLP log record's attributes. If the record
+// carries usage numbers, accumulate into per-session totals and (when a
+// correlation id is present) per-call totals, then broadcast a delta so
+// listeners can attribute tokens to whichever stage/turn owns the call.
+function recordTokenUsage(sessionId, attrs) {
+  const input = pickFirstNumber(attrs, TOKEN_KEYS.input);
+  const output = pickFirstNumber(attrs, TOKEN_KEYS.output);
+  const cacheRead = pickFirstNumber(attrs, TOKEN_KEYS.cache_read);
+  const cacheCreation = pickFirstNumber(attrs, TOKEN_KEYS.cache_creation);
+  if (!(input || output || cacheRead || cacheCreation)) return null;
+
+  const bucket = ensureTokenBucket(sessionId);
+  bucket.totals.input += input;
+  bucket.totals.output += output;
+  bucket.totals.cache_read += cacheRead;
+  bucket.totals.cache_creation += cacheCreation;
+
+  const callId = pickFirstString(attrs, CALL_ID_KEYS);
+  if (callId) {
+    let perCall = bucket.byCallId.get(callId);
+    if (!perCall) {
+      perCall = { input: 0, output: 0, cache_read: 0, cache_creation: 0 };
+      bucket.byCallId.set(callId, perCall);
+    }
+    perCall.input += input;
+    perCall.output += output;
+    perCall.cache_read += cacheRead;
+    perCall.cache_creation += cacheCreation;
+  }
+
+  const delta = { input, output, cache_read: cacheRead, cache_creation: cacheCreation };
+  broadcastFn?.({
+    type: 'session.tokens',
+    id: sessionId,
+    callId: callId || null,
+    delta,
+    totals: { ...bucket.totals },
+  });
+  return delta;
+}
 
 function getPendingToolSet(id) {
   let set = codexPendingTools.get(id);
@@ -117,6 +198,13 @@ function handleLogs(req, res) {
 
         // Track last event per session (used by menu detection validation)
         if (eventName) lastEvent.set(resolvedId, eventName + (attrs['event.kind'] ? ':' + attrs['event.kind'] : ''));
+
+        // Per-step token attribution: any log record may carry LLM usage
+        // numbers (Claude emits them on `claude_code.api_request`, Codex on
+        // its model-response events, Gemini on `gen_ai.client.token.usage`).
+        // recordTokenUsage is a no-op when no usage attrs are present, so
+        // it's safe to call on every record.
+        recordTokenUsage(resolvedId, attrs);
 
         // Codex can emit a brief completion between tool phases. Keep idle
         // pending for a tiny settle window and cancel it on any fresh Codex
@@ -305,8 +393,19 @@ function clear(id) {
   codexOutputDone.delete(id);
   codexToolPhasePending.delete(id);
   clearPendingTools(id);
+  tokenStats.delete(id);
   const pending = pendingSetup.get(id);
   if (pending) { clearTimeout(pending.timer); pendingSetup.delete(id); }
+}
+
+// Snapshot of token usage for a session. Returns null if nothing recorded.
+// byCallId is converted from Map → plain object for easy serialization.
+function getTokenStats(id) {
+  const bucket = tokenStats.get(id);
+  if (!bucket) return null;
+  const byCallId = {};
+  for (const [k, v] of bucket.byCallId) byCallId[k] = { ...v };
+  return { totals: { ...bucket.totals }, byCallId };
 }
 
 function getLastEvent(id) { return lastEvent.get(id) || ''; }
@@ -316,4 +415,4 @@ function hasEvents(id) {
   return activity.has(id);
 }
 
-module.exports = { init, handleLogs, clear, hasEvents, getLastEvent, cancelCodexMenuPoll, watchSession, armCodexStop, markCodexStart, markCodexIdle };
+module.exports = { init, handleLogs, clear, hasEvents, getLastEvent, cancelCodexMenuPoll, watchSession, armCodexStop, markCodexStart, markCodexIdle, getTokenStats };

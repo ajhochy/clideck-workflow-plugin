@@ -27,6 +27,7 @@ const stages = {
   planning: require('./lib/stages/planning'),
   issues: require('./lib/stages/issues'),
   pipeline: require('./lib/stages/pipeline'),
+  'manual-setup': require('./lib/stages/manual-setup'),
   smoketest: require('./lib/stages/smoketest'),
 };
 
