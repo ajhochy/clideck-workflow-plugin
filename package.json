@@ -9,7 +9,8 @@
   "scripts": {
     "start": "node server.js",
     "build:css": "tailwindcss -i src/input.css -o public/tailwind.css --minify",
-    "prepublishOnly": "npm run build:css"
+    "prepublishOnly": "npm run build:css",
+    "postinstall": "node tools/install-git-hooks.js"
   },
   "keywords": [
     "terminal",

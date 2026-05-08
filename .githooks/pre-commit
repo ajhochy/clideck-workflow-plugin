@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Auto-bump plugin manifest versions when plugin code is staged without a
+# corresponding clideck-plugin.json bump. Without this, the runtime
+# plugin-loader silently keeps stale code in ~/.clideck/plugins/<id>/.
+set -e
+node "$(git rev-parse --show-toplevel)/tools/bump-plugin-versions.js"
